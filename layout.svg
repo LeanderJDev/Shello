@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="1920"
+   height="1080"
+   viewBox="0 0 508 285.75"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   sodipodi:docname="layout.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="0.43803524"
+     inkscape:cx="1432.5331"
+     inkscape:cy="647.2082"
+     inkscape:window-width="1854"
+     inkscape:window-height="1003"
+     inkscape:window-x="66"
+     inkscape:window-y="40"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs2" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="fill:#29211a;stroke-width:0.241838"
+       id="rect234"
+       width="300"
+       height="285"
+       x="104"
+       y="0" />
+    <rect
+       style="fill:#272727;fill-opacity:1;stroke-width:0.25488"
+       id="rect2442-7"
+       width="288"
+       height="16.798183"
+       x="110.33628"
+       y="256.29788"
+       rx="1"
+       ry="1" />
+    <rect
+       style="fill:#413337;fill-opacity:1;stroke-width:0.240852"
+       id="rect2442"
+       width="288"
+       height="15"
+       x="110"
+       y="267"
+       ry="1"
+       rx="1" />
+    <text
+       xml:space="preserve"
+       style="font-size:8.46667px;font-family:roboto;-inkscape-font-specification:roboto;fill:#ffffff;fill-opacity:1;stroke-width:0.264583"
+       x="198.43454"
+       y="25.320023"
+       id="text2380"><tspan
+         sodipodi:role="line"
+         id="tspan2378"
+         style="stroke-width:0.264583"
+         x="198.43454"
+         y="25.320023" /></text>
+    <text
+       xml:space="preserve"
+       style="font-size:16.9333px;font-family:roboto;-inkscape-font-specification:roboto;fill:#ffffff;fill-opacity:1;stroke-width:0.264583"
+       x="237.32301"
+       y="19.699974"
+       id="text2384"><tspan
+         sodipodi:role="line"
+         id="tspan2382"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:16.9333px;font-family:'MesloLGS NF';-inkscape-font-specification:'MesloLGS NF';stroke-width:0.264583"
+         x="237.32301"
+         y="19.699974">Paul</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:8.46667px;font-family:roboto;-inkscape-font-specification:roboto;fill:#ffffff;fill-opacity:1;stroke-width:0.264583"
+       x="114.68353"
+       y="277.35001"
+       id="text2388"><tspan
+         sodipodi:role="line"
+         id="tspan2386"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:8.46667px;font-family:'MesloLGS NF';-inkscape-font-specification:'MesloLGS NF';stroke-width:0.264583"
+         x="114.68353"
+         y="277.35001">&gt; send &quot;Hallo zurück!&quot;</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:8.46667px;font-family:roboto;-inkscape-font-specification:roboto;text-align:end;text-anchor:end;fill:#ffffff;fill-opacity:1;stroke-width:0.264583"
+       x="392.64713"
+       y="236.35001"
+       id="text2388-3"><tspan
+         sodipodi:role="line"
+         id="tspan2386-6"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:8.46667px;font-family:'MesloLGS NF';-inkscape-font-specification:'MesloLGS NF';text-align:end;text-anchor:end;stroke-width:0.264583"
+         x="392.64713"
+         y="236.35001">Hallo du.</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:8.46667px;font-family:roboto;-inkscape-font-specification:roboto;text-align:end;text-anchor:end;fill:#a7a7a7;fill-opacity:1;stroke-width:0.264583"
+       x="249.99672"
+       y="264.43683"
+       id="text3971"><tspan
+         sodipodi:role="line"
+         id="tspan3969"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:'MesloLGS NF';-inkscape-font-specification:'MesloLGS NF';fill:#a7a7a7;fill-opacity:1;stroke-width:0.264583"
+         x="249.99672"
+         y="264.43683">command not found: shutdown</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:8.46667px;font-family:roboto;-inkscape-font-specification:roboto;text-align:end;text-anchor:end;fill:#a7a7a7;fill-opacity:1;stroke-width:0.264583"
+       x="395.05243"
+       y="264.49835"
+       id="text4855"><tspan
+         sodipodi:role="line"
+         id="tspan4853"
+         style="stroke-width:0.264583"
+         x="395.05243"
+         y="264.49835">x</tspan></text>
+  </g>
+</svg>
