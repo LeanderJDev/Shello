@@ -1,7 +1,9 @@
 import type { Route } from "./+types/terminal";
 import Input from "../components/input";
 import Popover from "../components/popover";
+import Character from "~/components/character/Character";
 import { useState, useRef, useEffect } from "react";
+import { EmotionKey } from "~/components/character/types";
 
 export function meta({}: Route.MetaArgs) {
     return [
@@ -162,6 +164,7 @@ export default function Terminal() {
     return (
         <div className="flex items-center justify-center h-screen bg-gray-600">
             <div className="flex flex-col w-full h-full max-w-5xl">
+                <Character emotion={EmotionKey.Surprised} />
                 {/* Messages: nimmt verbleibenden Platz ein, extra padding-bottom damit nichts vom Input verdeckt wird */}
                 <div className="flex-1 overflow-auto p-4 pb-32 bg-black text-white font-mono">
                     <div ref={messagesRef} className="w-full">
@@ -181,7 +184,6 @@ export default function Terminal() {
                         ))}
                     </div>
                 </div>
-
                 {/* Sticky wrapper for bottom bar */}
                 <div className="sticky bottom-0 relative z-50">
                     {/* Popover for error messages*/}
