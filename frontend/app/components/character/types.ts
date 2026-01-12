@@ -62,8 +62,8 @@ export const EMOTIONS: Record<EmotionKey, FaceConfig> = {
   [EmotionKey.Crazy]: {
     leftArm: { char: '~', y: 0 },
     rightArm: { char: '~', y: 0 },
-    leftEye: '°',
-    rightEye: '°',
+    leftEye: 'o',
+    rightEye: 'o',
     mouth: '-',
   },
   [EmotionKey.TPose]: {
