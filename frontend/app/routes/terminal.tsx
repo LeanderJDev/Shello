@@ -106,6 +106,18 @@ export default function Terminal() {
     const inputRef = useRef<HTMLInputElement | null>(null);
     const messagesRef = useRef<HTMLDivElement | null>(null);
 
+    // cycle through available emotions
+    const emotionKeys = Object.values(EmotionKey) as EmotionKey[];
+    const [emotionIndex, setEmotionIndex] = useState(0);
+    const currentEmotion = emotionKeys[emotionIndex % emotionKeys.length];
+
+    useEffect(() => {
+        const id = setInterval(() => {
+            setEmotionIndex((i) => (i + 1) % emotionKeys.length);
+        }, 2200);
+        return () => clearInterval(id);
+    }, [emotionKeys.length]);
+
     const commands = Object.keys(COMMANDS);
 
     useEffect(() => {
@@ -164,9 +176,9 @@ export default function Terminal() {
     return (
         <div className="flex items-center justify-center h-screen bg-gray-600">
             <div className="flex flex-col w-full h-full max-w-5xl">
-                <Character emotion={EmotionKey.Surprised} />
                 {/* Messages: nimmt verbleibenden Platz ein, extra padding-bottom damit nichts vom Input verdeckt wird */}
                 <div className="flex-1 overflow-auto p-4 pb-32 bg-black text-white font-mono">
+                    <Character emotion={currentEmotion} />
                     <div ref={messagesRef} className="w-full">
                         {messages.map((m) => (
                             <div

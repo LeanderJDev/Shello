@@ -19,6 +19,8 @@ export enum EmotionKey {
   Sad = 'sad',
   Surprised = 'surprised',
   Angry = 'angry',
+  Crazy = 'crazy',
+  TPose = 'tpose',
 }
 
 export const EMOTIONS: Record<EmotionKey, FaceConfig> = {
@@ -27,7 +29,7 @@ export const EMOTIONS: Record<EmotionKey, FaceConfig> = {
     rightArm: { char: '>', y: -1 },
     leftEye: '^',
     rightEye: '^',
-    mouth: ' ',
+    mouth: '\u00A0',
   },
   [EmotionKey.Happy]: {
     leftArm: { char: '<', y: 1 },
@@ -51,11 +53,25 @@ export const EMOTIONS: Record<EmotionKey, FaceConfig> = {
     mouth: 'o',
   },
   [EmotionKey.Angry]: {
-    leftArm: { char: '-', y: 0 },
-    rightArm: { char: '-', y: 0 },
+    leftArm: { char: '<', y: 0 },
+    rightArm: { char: '>', y: 0 },
     leftEye: '`',
     rightEye: '´',
     mouth: '∧',
+  },
+  [EmotionKey.Crazy]: {
+    leftArm: { char: '~', y: 0 },
+    rightArm: { char: '~', y: 0 },
+    leftEye: '°',
+    rightEye: '°',
+    mouth: '-',
+  },
+  [EmotionKey.TPose]: {
+    leftArm: { char: '-', y: 0 },
+    rightArm: { char: '-', y: 0 },
+    leftEye: '⁻',
+    rightEye: '⁻',
+    mouth: '-',
   },
 };
 

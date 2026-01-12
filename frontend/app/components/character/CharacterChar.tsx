@@ -22,7 +22,9 @@ export default function CharacterChar({
 }: CharacterCharProps) {
     const transform = `translateY(${offsetToEm(y)})`;
     const defaultStyle: React.CSSProperties = {
-        display: "inline-block",
+        display: "inline-flex",
+        margin: 0,
+        padding: 0,
         fontFamily: "monospace, monospace",
         lineHeight: 1,
         transform,

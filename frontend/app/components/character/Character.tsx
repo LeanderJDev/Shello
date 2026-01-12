@@ -38,6 +38,8 @@ export default function Character({
         alignItems: "center",
         fontSize: `${size}px`,
         fontFamily: "monospace, monospace",
+        gap: "0",
+        letterSpacing: "-0.16em",
     };
 
     const spacerStyle: React.CSSProperties = {
@@ -54,9 +56,7 @@ export default function Character({
             <CharacterChar char={cfg.leftArm.char} y={cfg.leftArm.y} />
             <span>[</span>
             <CharacterChar char={cfg.leftEye} />
-            <span style={{ width: "0.25em", display: "inline-block" }} />
             <CharacterChar char={cfg.mouth} />
-            <span style={{ width: "0.25em", display: "inline-block" }} />
             <CharacterChar char={cfg.rightEye} />
             <span>]</span>
             <CharacterChar char={cfg.rightArm.char} y={cfg.rightArm.y} />
