@@ -454,11 +454,27 @@ export default function Terminal() {
 
     const onlineFlag = useRef<boolean>(false);
 
+    const nextRequestSilent = useRef<boolean>(false);
+
+    function tryPushMessage(text: string, kind: string, sender: string){
+        if (nextRequestSilent.current){
+            nextRequestSilent.current = false;
+            console.log(`uppressed msg:\n${text}`);
+            return;
+        }
+        pushMessage(text, kind, sender);
+    }
+
     const connectWebSocket = () => {
         ws.current = new WebSocket("ws://localhost:12000/ws");
         pushMessage("Connecting...", "TEMPINFO", "System");
         
-        ws.current.onopen = () => { onlineFlag.current = true; pushMessage("Connected to Shello Server.", "INFO", "System"); };
+        ws.current.onopen = () => {
+            onlineFlag.current = true;
+            pushMessage("Connected to Shello Server.", "INFO", "System");
+            nextRequestSilent.current = true;
+            getRooms();
+        };
 
         //wenn der Server was schickt, wird das hier ausgeführt
         ws.current.onmessage = (event) => {
@@ -477,12 +493,12 @@ export default function Terminal() {
                     setRooms(mappedRooms);
 
                     if (mappedRooms.length === 0) {
-                        pushMessage("Keine Räume verfügbar.", "TEMPINFO", "System");
+                        tryPushMessage("Keine Räume verfügbar.", "TEMPINFO", "System");
                         return;
                     }
 
                     const roomNames = mappedRooms.map((r: { id: number; name: string }) => r.name);
-                    pushMessage(
+                    tryPushMessage(
                         `Verfügbare Räume: \n${roomNames.join(", ")}`,
                         "TEMPINFO",
                         "System"
@@ -490,7 +506,7 @@ export default function Terminal() {
                     break;
                 case "msg":
                     if (data.error !== null)
-                        pushMessage("Fehler beim Senden der Nachricht: " + data.error, "ERROR", "System");
+                        tryPushMessage("Fehler beim Senden der Nachricht: " + data.error, "ERROR", "System");
                     else if (data.result === null || data.result.length == 0){
                         break;
                     }
@@ -511,18 +527,18 @@ export default function Terminal() {
                 case "login_as":
                     if (data.error === null){
                         setUser(data.result.username);
-                        pushMessage(`Gewechselt zu Nutzer ${data.result.username}.`, "INFO", "System");
+                        tryPushMessage(`Gewechselt zu Nutzer ${data.result.username}.`, "INFO", "System");
                         addUserToKnownList(data.result.user_id, data.result.username);
                     }
-                    else pushMessage(`Fehler beim Wechsel des Nutzers: ${data.error}`, "ERROR", "System");
+                    else tryPushMessage(`Fehler beim Wechsel des Nutzers: ${data.error}`, "ERROR", "System");
                     break;
                 case "create_user":
                     if (data.error === null){
                         setUser(data.result.username);
-                        pushMessage(`Gewechselt zu neu ertelltem Nutzer '${data.result.username}'.`, "INFO", "System");
+                        tryPushMessage(`Gewechselt zu neu ertelltem Nutzer '${data.result.username}'.`, "INFO", "System");
                         addUserToKnownList(data.result.user_id, data.result.username);
                     }
-                    else pushMessage(`Fehler bei der Erstellung des Nutzers: ${data.error}`, "ERROR", "System");
+                    else tryPushMessage(`Fehler bei der Erstellung des Nutzers: ${data.error}`, "ERROR", "System");
                     break;
                 case "nameof_user":
                     if (data.error === null && data.result !== null){
