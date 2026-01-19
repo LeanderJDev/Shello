@@ -89,7 +89,6 @@ export default function Popover({ text, className, onClose, variant = "error", t
                     
                     {/* Inhalt */}
                     <div className="flex items-start gap-2">
-                        <span className="shrink-0">⚠</span>
                         <span className="whitespace-pre-wrap flex-1">{text}</span>
                     </div>
                 </div>

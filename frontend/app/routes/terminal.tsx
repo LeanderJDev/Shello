@@ -806,16 +806,20 @@ export default function Terminal() {
         </header>
 
         {/* System-Benachrichtigung mit Sprechblase */}
-        <Popover 
-          text={systemNotification}
-          variant="system"
-          onClose={() => setSystemNotification("")}
-          themeColors={{
-            bgColor: themeColors.bgColor,
-            textColor: themeColors.textColor,
-            borderColor: themeColors.borderColor
-          }}
-        />
+        <div style={{ position: "fixed", top: 70, left: 0, right: 190, zIndex: 9999, pointerEvents: "none" }}>
+          <div style={{ pointerEvents: systemNotification ? "auto" : "none" }}>
+            <Popover 
+              text={systemNotification}
+              variant="system"
+              onClose={() => setSystemNotification("")}
+              themeColors={{
+                bgColor: themeColors.bgColor,
+                textColor: themeColors.textColor,
+                borderColor: themeColors.borderColor
+              }}
+            />
+          </div>
+        </div>
 
         {/* Nachrichten-Bereich: Terminal Style */}
         <div className="flex-1 overflow-y-auto p-6 font-mono text-sm">
