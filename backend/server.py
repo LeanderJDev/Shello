@@ -77,6 +77,12 @@ class DatabaseClient:
         if users[0] and not users[0].get("error"):
             return users[0].get("ID")
         return None
+    
+    def get_user_by_ID(self, user_id):
+        users = self.request(f"/user?UserID={user_id}", method="GET")
+        if users[0] and not users[0].get("error"):
+            return users[0].get("Name")
+        return None
 
 user_id = 0 # logged in as guest by default
 
@@ -105,7 +111,10 @@ async def handle_client(websocket, dbClient):
                         elif dbClient.get_user_by_name(username) is not None:
                             error = "user already exists"
                         else:
-                            result = dbClient.create_user(username)
+                            db_result = dbClient.create_user(username)
+                            if db_result is not None and db_result.get("error") is None:
+                                result = {"username": db_result.get("Username"), "user_id": db_result.get("ID")}
+                            
                     
                     case "create_room":
                         room_name = data.get("room_name").strip()
@@ -124,7 +133,7 @@ async def handle_client(websocket, dbClient):
                         else:
                             result = dbClient.create_message(user_id, room_id, text)
                             if result is not None and result.get("error") is None:
-                                result = text
+                                result = dbClient.get_messages(room_id)
                     
                     case "get_rooms":
                         result = dbClient.get_rooms()
@@ -148,21 +157,30 @@ async def handle_client(websocket, dbClient):
                         username = data.get("username").strip()
                         if not username:
                             error = "username required"
-                        elif username == "guest":
-                            user_id = 0  # guest user id
                         elif dbClient.get_user_by_name(username) is None:
                             error = "user does not exist"
                         else:
                             user_id = dbClient.get_user_by_name(username)
                             error = None
-                            result = {"Username": username, "user_id": user_id}
+                            result = {"username": username, "user_id": user_id}
+
+                    case "nameof_user":
+                        user_id = data.get("user_id")
+                        if not user_id:
+                            error = "user_id required"
+                        else:
+                            user = dbClient.get_user_by_ID(user_id)
+                            if user:
+                                result = {"username": user, "user_id": user_id}
+                            else:
+                                error = "User not found."
 
                     case _:
                         error = f"Unknown function: {func}"
                 
-                print(f"Result: {result}")
+                print(f"Result: {result}, Error: {error}")
                 try:
-                    if result is not None and result.get("error") is not None:
+                    if error is None and result is not None and result.get("error") is not None:
                         error = result.get("error")
                         result = None
                 except AttributeError:
