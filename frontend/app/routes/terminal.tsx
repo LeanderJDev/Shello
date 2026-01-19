@@ -584,11 +584,6 @@ export default function Terminal() {
         ws.current?.send(JSON.stringify({ func: "msg", text: text, room_id: roomID }));
     };
 
-    function getNameOfUser(userID: number) {
-        // Nachricht an Server senden
-        ws.current?.send(JSON.stringify({ func: "nameof_user", user_id: userID }) );
-    };
-
     function createUser(username: string) {
         // Nachricht an Server senden
         ws.current?.send(JSON.stringify({ func: "create_user", username: username }));

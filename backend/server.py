@@ -73,26 +73,30 @@ class DatabaseClient:
         return room
     
     def get_user_by_name(self, username):
-        users = self.request(f"/user?Username={username}", method="GET")
-        if users[0] and not users[0].get("error"):
-            return users[0].get("ID")
-        return None
+        users = self.request(f"/user", method="GET")
+        if users and not users[0].get("error"):
+            for user in users:
+                if user.get("Name") == username:
+                    return { "user_id": user.get("ID"), "username": user.get("Name") }
+        return { "error": "user not found" }
     
     def get_user_by_ID(self, user_id):
-        users = self.request(f"/user?UserID={user_id}", method="GET")
-        if users[0] and not users[0].get("error"):
-            return users[0].get("Name")
-        return None
+        users = self.request(f"/user", method="GET")
+        if users and not users[0].get("error"):
+            for user in users:
+                if user.get("ID") == user_id:
+                    return { "user_id": user.get("ID"), "username": user.get("Name") }
+        return { "error": "user not found" }
 
-user_id = 0 # logged in as guest by default
 
 async def handle_client(websocket, dbClient):
     """Handle a single WebSocket client connection"""
     print(f"Client connected: {websocket.remote_address}")
     
+    user_id = 0 # logged in as guest by default
+
     try:
         async for message in websocket:
-            global user_id
             try:
                 # Parse incoming JSON message
                 data = json.loads(message)
@@ -108,13 +112,12 @@ async def handle_client(websocket, dbClient):
                         username = data.get("username").strip()
                         if not username or username.strip().lower() == "guest":
                             error = "username required"
-                        elif dbClient.get_user_by_name(username) is not None:
+                        elif dbClient.get_user_by_name(username).get("error") is None:
                             error = "user already exists"
                         else:
                             db_result = dbClient.create_user(username)
                             if db_result is not None and db_result.get("error") is None:
                                 result = {"username": db_result.get("Username"), "user_id": db_result.get("ID")}
-                            
                     
                     case "create_room":
                         room_name = data.get("room_name").strip()
@@ -157,23 +160,24 @@ async def handle_client(websocket, dbClient):
                         username = data.get("username").strip()
                         if not username:
                             error = "username required"
-                        elif dbClient.get_user_by_name(username) is None:
-                            error = "user does not exist"
+                            break
+                        user = dbClient.get_user_by_name(username)
+                        if user.get("error") is None:
+                            user_id = user.get("user_id")
+                            result = user
                         else:
-                            user_id = dbClient.get_user_by_name(username)
-                            error = None
-                            result = {"username": username, "user_id": user_id}
+                            error = "User not found."
 
                     case "nameof_user":
-                        user_id = data.get("user_id")
-                        if not user_id:
+                        _user_id = data.get("user_id")
+                        if not _user_id:
                             error = "user_id required"
+                            break
+                        user = dbClient.get_user_by_ID(_user_id)
+                        if user.get("error") is None:
+                            result = user
                         else:
-                            user = dbClient.get_user_by_ID(user_id)
-                            if user:
-                                result = {"username": user, "user_id": user_id}
-                            else:
-                                error = "User not found."
+                            error = "User not found."
 
                     case _:
                         error = f"Unknown function: {func}"
