@@ -1,92 +1,10 @@
-"""
-The Chat server of our project
-
-it uses WebSockets to communicate with the client
-
-the messages are forwarded to the database REST API
-"""
-
 import os
 import asyncio
 import json
 from dotenv import load_dotenv
-import requests
 import websockets
 
-
-class DatabaseClient:
-    def __init__(self, api_url, api_key):
-        self.api_url = api_url
-        self.api_key = api_key
-
-    def request(
-        self,
-        endpoint,
-        method="GET",
-        body=None,
-    ):
-        if method == "GET":
-            r = requests.get(
-                f"{self.api_url+endpoint}", headers={"api-key": self.api_key}
-            )
-            # r.raise_for_status()
-            # print(r.json());
-            return r.json()
-        if method == "POST":
-            r = requests.post(
-                f"{self.api_url+endpoint}",
-                headers={"api-key": self.api_key, "Content-Type": "application/json"},
-                json=body,
-            )
-            # r.raise_for_status()  # Might need to parse response message
-            # print(r.json());
-            return r.json()
-        raise ValueError("Unsupported HTTP method: " + method)
-
-    def create_room(self, user_id, room_name):
-        data = {"UserID": user_id, "Roomname": room_name}
-        room = self.request("/rooms", method="POST", body=data)
-        return room
-
-    def create_user(self, username):
-        print(username)
-        data = {"Username": username}
-        user = self.request("/user", method="POST", body=data)
-        return user
-
-    def create_message(self, user_id, room_id, content):
-        data = {"UserID": user_id, "RoomID": room_id, "Message": content}
-        message = self.request("/messages", method="POST", body=data)
-        return message
-
-    def get_rooms(self):
-        rooms = self.request("/rooms", method="GET")
-        return rooms
-
-    def get_messages(self, room_id):
-        messages = self.request(f"/messages?RoomID={room_id}", method="GET")
-        return messages
-
-    def edit_room_name(self, room_id, new_name):
-        data = {"RoomID": room_id, "Name": new_name}
-        room = self.request(f"/rooms", method="PATCH", body=data)
-        return room
-
-    def get_user_by_name(self, username):
-        users = self.request(f"/user", method="GET")
-        if users and not users[0].get("error"):
-            for user in users:
-                if user.get("Name") == username:
-                    return {"user_id": user.get("ID"), "username": user.get("Name")}
-        return {"error": "user not found"}
-
-    def get_user_by_ID(self, user_id):
-        users = self.request(f"/user", method="GET")
-        if users and not users[0].get("error"):
-            for user in users:
-                if user.get("ID") == user_id:
-                    return {"user_id": user.get("ID"), "username": user.get("Name")}
-        return {"error": "user not found"}
+from database import DatabaseClient
 
 
 async def handle_client(websocket, dbClient):
@@ -109,63 +27,93 @@ async def handle_client(websocket, dbClient):
 
                 match func:
                     case "create_user":
-                        username = data.get("username").strip()
+                        username = (data.get("username") or "").strip()
                         if not username or username.strip().lower() == "guest":
                             error = "username required"
-                        elif dbClient.get_user_by_name(username).get("error") is None:
-                            error = "user already exists"
                         else:
-                            db_result = dbClient.create_user(username)
-                            if db_result is not None and db_result.get("error") is None:
-                                result = {
-                                    "username": db_result.get("Username"),
-                                    "user_id": db_result.get("ID"),
-                                }
+                            try:
+                                exists = dbClient.get_user_by_name(username)
+                            except Exception as e:
+                                error = f"db error: {e}"
+                                exists = {"error": "lookup failed"}
+                            if exists and exists.get("error") is None:
+                                error = "user already exists"
+                            else:
+                                try:
+                                    new_id = dbClient.create_user(username)
+                                except Exception as e:
+                                    error = f"db error: {e}"
+                                    new_id = None
+                                if new_id:
+                                    result = {"username": username, "user_id": new_id}
 
                     case "create_room":
-                        room_name = data.get("room_name").strip()
+                        room_name = (data.get("room_name") or "").strip()
                         if not room_name:
                             error = "room_name required"
                         else:
-                            result = dbClient.create_room(user_id, room_name)
+                            try:
+                                result = dbClient.create_room(user_id, room_name)
+                            except Exception as e:
+                                error = f"db error: {e}"
 
                     case "msg":
                         room_id = data.get("room_id")
-                        text = data.get("text").strip()
+                        text = (data.get("text") or "").strip()
                         if not room_id or not text:
                             error = "room_id and text required"
                         elif room_id == -1:
                             error = "No room selected."
                         else:
-                            result = dbClient.create_message(user_id, room_id, text)
-                            if result is not None and result.get("error") is None:
-                                result = dbClient.get_messages(room_id)
+                            try:
+                                ok = dbClient.create_message(user_id, room_id, text)
+                            except Exception as e:
+                                error = f"db error: {e}"
+                                ok = False
+                            if not error and ok:
+                                try:
+                                    result = dbClient.get_messages(room_id)
+                                except Exception as e:
+                                    error = f"db error: {e}"
 
                     case "get_rooms":
-                        result = dbClient.get_rooms()
+                        try:
+                            result = dbClient.get_rooms()
+                        except Exception as e:
+                            error = f"db error: {e}"
 
                     case "get_messages":
                         room_id = data.get("room_id")
                         if not room_id:
                             error = "room_id required"
                         else:
-                            result = dbClient.get_messages(room_id)
+                            try:
+                                result = dbClient.get_messages(room_id)
+                            except Exception as e:
+                                error = f"db error: {e}"
 
                     case "edit_room_name":
                         room_id = data.get("room_id")
-                        new_name = data.get("new_name").strip()
+                        new_name = (data.get("new_name") or "").strip()
                         if not room_id or not new_name:
                             error = "room_id and new_name required"
                         else:
-                            result = dbClient.edit_room_name(room_id, new_name)
+                            try:
+                                result = dbClient.edit_room_name(room_id, new_name)
+                            except Exception as e:
+                                error = f"db error: {e}"
 
                     case "login_as":
-                        username = data.get("username").strip()
+                        username = (data.get("username") or "").strip()
                         if not username:
                             error = "username required"
                             break
-                        user = dbClient.get_user_by_name(username)
-                        if user.get("error") is None:
+                        try:
+                            user = dbClient.get_user_by_name(username)
+                        except Exception as e:
+                            error = f"db error: {e}"
+                            user = {"error": "lookup failed"}
+                        if user and user.get("error") is None:
                             user_id = user.get("user_id")
                             result = user
                         else:
@@ -176,8 +124,12 @@ async def handle_client(websocket, dbClient):
                         if not _user_id:
                             error = "user_id required"
                             break
-                        user = dbClient.get_user_by_ID(_user_id)
-                        if user.get("error") is None:
+                        try:
+                            user = dbClient.get_user_by_ID(_user_id)
+                        except Exception as e:
+                            error = f"db error: {e}"
+                            user = {"error": "lookup failed"}
+                        if user and user.get("error") is None:
                             result = user
                         else:
                             error = "User not found."
@@ -225,9 +177,13 @@ async def main(serverPort, apiKey, apiUrl):
         print(f"Warning: Could not connect to database: {e}")
 
     async with websockets.serve(
-        lambda ws: handle_client(ws, dbClient), "localhost", serverPort
+        lambda ws: handle_client(ws, dbClient),
+        serverPort["host"],
+        serverPort["port"],
     ):
-        print(f"WebSocket server running on ws://localhost:{serverPort}/ws")
+        print(
+            f"WebSocket server running on ws://{serverPort['host']}:{serverPort['port']}/ws"
+        )
         await asyncio.Future()  # run forever
 
 
@@ -295,9 +251,16 @@ if __name__ == "__main__":
         )
     print(f"Connecting to API URL: {SHELLO_API_URL}")
 
-    serverPort = 12000
+    # configure host/port from environment
+    server_host = os.getenv("SHELLO_WS_HOST", "localhost")
+    try:
+        server_port = int(os.getenv("SHELLO_WS_PORT", "12000"))
+    except Exception:
+        server_port = 12000
+
+    server_addr = {"host": server_host, "port": server_port}
 
     try:
-        asyncio.run(main(serverPort, SHELLO_API_KEY, SHELLO_API_URL))
+        asyncio.run(main(server_addr, SHELLO_API_KEY, SHELLO_API_URL))
     except KeyboardInterrupt:
         print("\nServer shut down.")

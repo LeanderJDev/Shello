@@ -1,4 +1,3 @@
-dotenv
-sockets
+python-dotenv
 requests
 websockets

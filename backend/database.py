@@ -81,3 +81,37 @@ class DatabaseClient:
 
     def get_readconfirmation(self, message_id):
         return self.request(f"/readconfirmation?MessageID={message_id}", method="GET")
+
+    # Convenience helpers used by the WebSocket server for lookups
+    def get_user_by_name(self, username: str):
+        users = self.get_users()
+        if not users:
+            return {"error": "user not found"}
+        # users may be a list of dicts
+        for u in users:
+            if not isinstance(u, dict):
+                continue
+            name = u.get("Name") or u.get("Username") or u.get("username")
+            uid = u.get("ID") or u.get("id") or u.get("UserID") or u.get("user_id")
+            if name == username:
+                return {"user_id": uid, "username": name}
+        return {"error": "user not found"}
+
+    def get_user_by_ID(self, user_id):
+        users = self.get_users()
+        if not users:
+            return {"error": "user not found"}
+        for u in users:
+            if not isinstance(u, dict):
+                continue
+            uid = u.get("ID") or u.get("id") or u.get("UserID") or u.get("user_id")
+            name = u.get("Name") or u.get("Username") or u.get("username")
+            # compare as int when possible
+            try:
+                if uid is not None and int(uid) == int(user_id):
+                    return {"user_id": uid, "username": name}
+            except Exception:
+                # fallback to string comparison
+                if str(uid) == str(user_id):
+                    return {"user_id": uid, "username": name}
+        return {"error": "user not found"}

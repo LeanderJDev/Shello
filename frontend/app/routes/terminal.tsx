@@ -8,7 +8,7 @@ import { EmotionKey } from "~/components/character/types";
 export function meta({}: Route.MetaArgs) {
     return [
         { title: "Shello" },
-        { name: "description", content: "The shell inspired messagingapp" },
+        { name: "description", content: "The shell inspired messaging app" },
     ];
 }
 

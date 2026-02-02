@@ -7,3 +7,5 @@
 server.log
 
 .venv/
+
+__pycache__/
