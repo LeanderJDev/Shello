@@ -6,5 +6,7 @@
 /.react-router/
 /build/
 
+# Python cache
+*.pyc
 # vscode
 .vscode/
