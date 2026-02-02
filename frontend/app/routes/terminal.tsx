@@ -7,8 +7,8 @@ import { EmotionKey } from "~/components/character/types";
 
 export function meta({}: Route.MetaArgs) {
     return [
-        { title: "Testing" },
-        { name: "description", content: "Welcome to React Router!" },
+        { title: "Shello" },
+        { name: "description", content: "The shell inspired messagingapp" },
     ];
 }
 
@@ -22,11 +22,11 @@ function parseCommand(input: string) {
     let cur = ""; // Aktuelles Wort/Argument wird hier aufgebaut
     let inQuote = false; // Flag: befinden wir uns in Anführungszeichen?
     let quoteChar = ""; // Welches Anführungszeichen wurde geöffnet (' oder ")?
-    
+
     // Zeichenweise durch Input iterieren
     for (let i = 0; i < input.length; i++) {
         const ch = input[i];
-        
+
         if (inQuote) {
             // Wir sind innerhalb von Anführungszeichen
             if (ch === quoteChar) {
@@ -59,13 +59,13 @@ function parseCommand(input: string) {
             }
         }
     }
-    
+
     // Letztes Argument hinzufügen, falls vorhanden
     if (cur !== "") args.push(cur);
-    
+
     // Fehler wenn Anführungszeichen nicht geschlossen wurde
     if (inQuote) throw new Error("Unterminated quote");
-    
+
     // Erstes Argument ist der Befehl, Rest sind Parameter
     const cmd = args.shift() || "";
     return { cmd, args };
@@ -95,7 +95,7 @@ type CmdHandler = (
         showSystemNotification: (text: string) => void;
         themeColors?: ThemeColors;
         setThemeColors?: (colors: ThemeColors) => void;
-    }
+    },
 ) => void | Promise<void>;
 
 /**
@@ -105,10 +105,18 @@ type CmdHandler = (
  */
 const COMMANDS: Record<string, CmdHandler> = {
     h: (_args, ctx) => {
-        ctx.pushMessage( "Verfügbare Befehle: " + Object.keys(COMMANDS).join(", "), "INFO", "System");
+        ctx.pushMessage(
+            "Verfügbare Befehle: " + Object.keys(COMMANDS).join(", "),
+            "INFO",
+            "System",
+        );
     },
     whoami: (_args, ctx) => {
-        ctx.pushMessage("Aktueller Benutzer: <" + ctx.user + ">", "INFO", "System");
+        ctx.pushMessage(
+            "Aktueller Benutzer: <" + ctx.user + ">",
+            "INFO",
+            "System",
+        );
         //ctx.showSystemNotification("Aktueller Benutzer: <" + ctx.user + ">");
     },
     clear: (_args, ctx) => {
@@ -127,19 +135,31 @@ const COMMANDS: Record<string, CmdHandler> = {
     forge: (args, ctx) => {
         if (!args[0]) throw new Error("forge: Benutzername fehlt");
         ctx.createUser(args[0]);
-        ctx.pushMessage(`Erstelle neuen Nutzer '${args[0]}'...`, "TEMPINFO", "System");
+        ctx.pushMessage(
+            `Erstelle neuen Nutzer '${args[0]}'...`,
+            "TEMPINFO",
+            "System",
+        );
         ctx.showSystemNotification(`Neuer Nutzer '${args[0]}' erstellt`);
     },
-    
+
     // Wechselt zu einem anderen Benutzer
     impersonate: (args, ctx) => {
         if (!args[0]) throw new Error("impersonate: Benutzername fehlt");
         ctx.changeUser(args[0]);
-        ctx.pushMessage(`Wechsel zu Nutzer '${args[0]}'...`, "TEMPINFO", "System");
+        ctx.pushMessage(
+            `Wechsel zu Nutzer '${args[0]}'...`,
+            "TEMPINFO",
+            "System",
+        );
     },
     enter: (args, ctx) => {
         if (!args[0]) throw new Error("enter: Raumname fehlt");
-        ctx.pushMessage(`Wechsel zu Raum '${args[0]}'...`, "TEMPINFO", "System");
+        ctx.pushMessage(
+            `Wechsel zu Raum '${args[0]}'...`,
+            "TEMPINFO",
+            "System",
+        );
         ctx.enterRoom(args[0]);
     },
     roomtour: (args, ctx) => {
@@ -147,7 +167,7 @@ const COMMANDS: Record<string, CmdHandler> = {
     },
 
     // === PERSONALISIERUNG ===
-    
+
     // theme - Passe die Farben und Schriftarten des Terminals an.
     // Optionen:
     //   -tc <Farbe>  - Textfarbe (text color)
@@ -161,7 +181,7 @@ const COMMANDS: Record<string, CmdHandler> = {
             ctx.showSystemNotification("Theme-Verwaltung nicht verfügbar");
             return;
         }
-        
+
         // Parse Argumente
         let textColor: string | null = null;
         let bgColor: string | null = null;
@@ -169,7 +189,7 @@ const COMMANDS: Record<string, CmdHandler> = {
         let outerBgColor: string | null = null;
         let hoverColor: string | null = null;
         let font: string | null = null;
-        
+
         for (let i = 0; i < args.length; i++) {
             if (args[i] === "-tc" && i + 1 < args.length) {
                 textColor = args[i + 1];
@@ -191,76 +211,89 @@ const COMMANDS: Record<string, CmdHandler> = {
                 i++;
             }
         }
-        
-        if (!textColor && !bgColor && !borderColor && !outerBgColor && !hoverColor && !font) {
-            ctx.showSystemNotification("Verwendung: theme [Optionen]\n" +
-                "Optionen:\n" +
-                "  -tc <Farbe>  Textfarbe\n" +
-                "  -bg <Farbe>  Hintergrundfarbe\n" +
-                "  -bc <Farbe>  Randfarbe\n" +
-                "  -ob <Farbe>  Äußere Hintergrundfarbe\n" +
-                "  -hv <Farbe>  Button Hover Farbe\n" +
-                "  -f <Schrift> Schriftart (noch nicht implementiert)\n\n" +
-                "Beispiel: theme -tc #00ff00 -bg #000000");
+
+        if (
+            !textColor &&
+            !bgColor &&
+            !borderColor &&
+            !outerBgColor &&
+            !hoverColor &&
+            !font
+        ) {
+            ctx.showSystemNotification(
+                "Verwendung: theme [Optionen]\n" +
+                    "Optionen:\n" +
+                    "  -tc <Farbe>  Textfarbe\n" +
+                    "  -bg <Farbe>  Hintergrundfarbe\n" +
+                    "  -bc <Farbe>  Randfarbe\n" +
+                    "  -ob <Farbe>  Äußere Hintergrundfarbe\n" +
+                    "  -hv <Farbe>  Button Hover Farbe\n" +
+                    "  -f <Schrift> Schriftart (noch nicht implementiert)\n\n" +
+                    "Beispiel: theme -tc #00ff00 -bg #000000",
+            );
             return;
         }
-        
+
         // Aktuelles Theme kopieren und anpassen
         const newTheme = { ...ctx.themeColors };
         const changes: string[] = [];
-        
+
         if (textColor) {
             newTheme.textColor = textColor;
             changes.push(`Textfarbe: ${textColor}`);
         }
-        
+
         if (bgColor) {
             newTheme.bgColor = bgColor;
             changes.push(`Hintergrundfarbe: ${bgColor}`);
         }
-        
+
         if (borderColor) {
             newTheme.borderColor = borderColor;
             changes.push(`Randfarbe: ${borderColor}`);
         }
-        
+
         if (outerBgColor) {
             newTheme.outerBgColor = outerBgColor;
             changes.push(`Äußere Hintergrundfarbe: ${outerBgColor}`);
         }
-        
+
         if (hoverColor) {
             newTheme.buttonHoverBgColor = hoverColor;
             changes.push(`Hover-Farbe: ${hoverColor}`);
         }
-        
+
         if (font) {
             // Schriftart wird hier nicht direkt im Theme gespeichert
             // TODO: Schriftart-Verwaltung implementieren
             changes.push(`Schriftart ${font} (noch nicht unterstützt)`);
         }
-        
+
         ctx.setThemeColors(newTheme);
-        ctx.showSystemNotification("Theme angepasst:\n  " + changes.join("\n  "));
+        ctx.showSystemNotification(
+            "Theme angepasst:\n  " + changes.join("\n  "),
+        );
     },
-    
+
     // theme save <Themenname> - Speichere aktuelles Theme
     "theme save": (args, ctx) => {
         if (!ctx.themeColors) {
             ctx.showSystemNotification("Theme-Verwaltung nicht verfügbar");
             return;
         }
-        
+
         if (args.length === 0) {
             ctx.showSystemNotification("Verwendung: theme save <Themenname>");
             return;
         }
-        
+
         const themeName = args[0];
-        
+
         // Theme im localStorage speichern
         try {
-            const savedThemes = JSON.parse(localStorage.getItem("savedThemes") || "{}");
+            const savedThemes = JSON.parse(
+                localStorage.getItem("savedThemes") || "{}",
+            );
             savedThemes[themeName] = ctx.themeColors;
             localStorage.setItem("savedThemes", JSON.stringify(savedThemes));
             ctx.showSystemNotification(`Theme '${themeName}' gespeichert`);
@@ -268,89 +301,99 @@ const COMMANDS: Record<string, CmdHandler> = {
             ctx.showSystemNotification("Fehler beim Speichern des Themes");
         }
     },
-    
+
     // theme load <Themenname> - Lade gespeichertes Theme
     "theme load": (args, ctx) => {
         if (!ctx.setThemeColors) {
             ctx.showSystemNotification("Theme-Verwaltung nicht verfügbar");
             return;
         }
-        
+
         if (args.length === 0) {
             // Liste alle gespeicherten Themes auf
             try {
-                const savedThemes = JSON.parse(localStorage.getItem("savedThemes") || "{}");
+                const savedThemes = JSON.parse(
+                    localStorage.getItem("savedThemes") || "{}",
+                );
                 const themeNames = Object.keys(savedThemes);
-                
+
                 if (themeNames.length === 0) {
-                    ctx.showSystemNotification("Keine gespeicherten Themes vorhanden");
+                    ctx.showSystemNotification(
+                        "Keine gespeicherten Themes vorhanden",
+                    );
                 } else {
-                    ctx.showSystemNotification("Gespeicherte Themes:\n  " + themeNames.join("\n  "));
+                    ctx.showSystemNotification(
+                        "Gespeicherte Themes:\n  " + themeNames.join("\n  "),
+                    );
                 }
             } catch (err) {
                 ctx.showSystemNotification("Fehler beim Laden der Theme-Liste");
             }
             return;
         }
-        
+
         const themeName = args[0];
-        
+
         // Theme aus localStorage laden
         try {
-            const savedThemes = JSON.parse(localStorage.getItem("savedThemes") || "{}");
-            
+            const savedThemes = JSON.parse(
+                localStorage.getItem("savedThemes") || "{}",
+            );
+
             if (!savedThemes[themeName]) {
-                ctx.showSystemNotification(`Theme '${themeName}' nicht gefunden`);
+                ctx.showSystemNotification(
+                    `Theme '${themeName}' nicht gefunden`,
+                );
                 return;
             }
-            
+
             ctx.setThemeColors(savedThemes[themeName]);
             ctx.showSystemNotification(`Theme '${themeName}' geladen`);
         } catch (err) {
             ctx.showSystemNotification("Fehler beim Laden des Themes");
         }
     },
-    
+
     // === SYSTEM ===
-    
+
     // Zeigt alle verfügbaren Befehle an
     help: async (_args, ctx) => {
         ctx.showSystemNotification(
             "Verfügbare Befehle:\n\n" +
-            "=== Nachrichten ===\n" +
-            "  send <Nachricht>     - Sendet eine Nachricht\n" +
-            "  clear                - Löscht alle Nachrichten aus dem Terminal\n" +
-            "  history              - Zeigt Befehlshistorie (noch nicht implementiert)\n\n" +
-            "=== Benutzer & Chat ===\n" +
-            "  whoami               - Zeigt aktuellen Benutzer\n" +
-            "  forge <Name>         - Erstellt neuen Benutzer\n" +
-            "  impersonate <Name>   - Wechselt zu anderem Benutzer\n" +
-            "  sc [Benutzer/Gruppe] - Wechselt Chat (noch nicht implementiert)\n" +
-            "  lc                   - Liste alle Benutzer/Gruppen (noch nicht implementiert)\n\n" +
-            "=== Gruppen ===\n" +
-            "  accede <Gruppe>      - Trete Gruppe bei (noch nicht implementiert)\n" +
-            "  secede <Gruppe>      - Verlasse Gruppe (noch nicht implementiert)\n\n" +
-            "=== Personalisierung ===\n" +
-            "  theme [Optionen]     - Passe Farben und Schrift an\n" +
-            "    -tc <Farbe>        - Textfarbe\n" +
-            "    -bg <Farbe>        - Hintergrundfarbe\n" +
-            "    -bc <Farbe>        - Randfarbe\n" +
-            "    -ob <Farbe>        - Äußere Hintergrundfarbe\n" +
-            "    -hv <Farbe>        - Button Hover Farbe\n" +
-            "    -f <Schrift>       - Schriftart (noch nicht implementiert)\n" +
-            "  theme save <Name>    - Speichere aktuelles Theme\n" +
-            "  theme load [Name]    - Lade gespeichertes Theme (ohne Name: Liste)\n\n" +
-            "=== System ===\n" +
-            "  help                 - Diese Hilfe\n" +
-            "  exit                 - Beende Terminal-Sitzung (noch nicht implementiert)"
+                "=== Nachrichten ===\n" +
+                "  send <Nachricht>     - Sendet eine Nachricht\n" +
+                "  clear                - Löscht alle Nachrichten aus dem Terminal\n" +
+                "  history              - Zeigt Befehlshistorie (noch nicht implementiert)\n\n" +
+                "=== Benutzer & Chat ===\n" +
+                "  whoami               - Zeigt aktuellen Benutzer\n" +
+                "  forge <Name>         - Erstellt neuen Benutzer\n" +
+                "  impersonate <Name>   - Wechselt zu anderem Benutzer\n" +
+                "  sc [Benutzer/Gruppe] - Wechselt Chat (noch nicht implementiert)\n" +
+                "  lc                   - Liste alle Benutzer/Gruppen (noch nicht implementiert)\n\n" +
+                "=== Gruppen ===\n" +
+                "  accede <Gruppe>      - Trete Gruppe bei (noch nicht implementiert)\n" +
+                "  secede <Gruppe>      - Verlasse Gruppe (noch nicht implementiert)\n\n" +
+                "=== Personalisierung ===\n" +
+                "  theme [Optionen]     - Passe Farben und Schrift an\n" +
+                "    -tc <Farbe>        - Textfarbe\n" +
+                "    -bg <Farbe>        - Hintergrundfarbe\n" +
+                "    -bc <Farbe>        - Randfarbe\n" +
+                "    -ob <Farbe>        - Äußere Hintergrundfarbe\n" +
+                "    -hv <Farbe>        - Button Hover Farbe\n" +
+                "    -f <Schrift>       - Schriftart (noch nicht implementiert)\n" +
+                "  theme save <Name>    - Speichere aktuelles Theme\n" +
+                "  theme load [Name]    - Lade gespeichertes Theme (ohne Name: Liste)\n\n" +
+                "=== System ===\n" +
+                "  help                 - Diese Hilfe\n" +
+                "  exit                 - Beende Terminal-Sitzung (noch nicht implementiert)",
         );
     },
-    
+
     // exit - Beende die Terminal-Sitzung.
     exit: (_args, ctx) => {
         // TODO: Implementieren
         ctx.showSystemNotification("exit command not implemented yet");
-    }
+    },
 };
 
 /**
@@ -370,7 +413,7 @@ const defaultTheme: ThemeColors = {
     bgColor: "#000000",
     textColor: "#00ff00",
     borderColor: "#333333",
-    buttonHoverBgColor: "#00cc00"
+    buttonHoverBgColor: "#00cc00",
 };
 
 /**
@@ -381,38 +424,44 @@ const defaultTheme: ThemeColors = {
 export default function Terminal() {
     // Aktueller Text im Input-Feld
     const [input, setInput] = useState("");
-    
+
     // Array aller angezeigten Nachrichten im Terminal
     // Jede Nachricht hat: id (eindeutig), text (Inhalt), kind (Typ: out/error/info), sender (Absender)
     const [messages, setMessages] = useState<
-        { id: number; text: string; kind?: string; sender: string; timestamp?: Date }[]
+        {
+            id: number;
+            text: string;
+            kind?: string;
+            sender: string;
+            timestamp?: Date;
+        }[]
     >([]);
-    
+
     // Aktueller Benutzername (wird im Prompt angezeigt)
     const [user, setUser] = useState("guest");
-    
+
     // Text für Fehler-Popover (leer = Popover ist versteckt)
     const [popoverText, setPopoverText] = useState(
-        "Benutzen Sie 'help' für Hilfe."
+        "Benutzen Sie 'help' für Hilfe.",
     );
 
-    const [knownUsers, setUsers] = useState<{ id: number; name: string; }[]>([]);
-    
+    const [knownUsers, setUsers] = useState<{ id: number; name: string }[]>([]);
+
     // Theme-Farben
     const [themeColors, setThemeColors] = useState<ThemeColors>(defaultTheme);
-    
+
     // System-Benachrichtigung
     const [systemNotification, setSystemNotification] = useState("");
-    
+
     // Letzte System-Benachrichtigung (für Toggle-Funktion)
     const [lastSystemNotification, setLastSystemNotification] = useState("");
-    
+
     // Counter für eindeutige Message-IDs
     const idRef = useRef(1);
-    
+
     // Referenz zum Input-Element (für Focus-Management)
     const inputRef = useRef<HTMLInputElement | null>(null);
-    
+
     // Referenz zum Messages-Container (für Auto-Scroll)
     const messagesRef = useRef<HTMLDivElement | null>(null);
 
@@ -428,8 +477,11 @@ export default function Terminal() {
         return () => clearInterval(id);
     }, [emotionKeys.length]);
 
-    const [[roomID, roomName], setRoom] = useState<[number, string]>([-1, "null"]);
-    const [rooms, setRooms] = useState<{ id: number; name: string; }[]>([]);
+    const [[roomID, roomName], setRoom] = useState<[number, string]>([
+        -1,
+        "null",
+    ]);
+    const [rooms, setRooms] = useState<{ id: number; name: string }[]>([]);
 
     // Liste aller verfügbaren Befehle (für Tab-Completion)
     const commands = Object.keys(COMMANDS);
@@ -470,8 +522,8 @@ export default function Terminal() {
 
     const nextRequestSilent = useRef<boolean>(false);
 
-    function tryPushMessage(text: string, kind: string, sender: string){
-        if (nextRequestSilent.current){
+    function tryPushMessage(text: string, kind: string, sender: string) {
+        if (nextRequestSilent.current) {
             nextRequestSilent.current = false;
             console.log(`uppressed msg:\n${text}`);
             return;
@@ -482,7 +534,7 @@ export default function Terminal() {
     const connectWebSocket = () => {
         ws.current = new WebSocket("ws://localhost:12000/ws");
         pushMessage("Connecting...", "TEMPINFO", "System");
-        
+
         ws.current.onopen = () => {
             onlineFlag.current = true;
             pushMessage("Connected to Shello Server.", "INFO", "System");
@@ -507,21 +559,31 @@ export default function Terminal() {
                     setRooms(mappedRooms);
 
                     if (mappedRooms.length === 0) {
-                        tryPushMessage("Keine Räume verfügbar.", "TEMPINFO", "System");
+                        tryPushMessage(
+                            "Keine Räume verfügbar.",
+                            "TEMPINFO",
+                            "System",
+                        );
                         return;
                     }
 
-                    const roomNames = mappedRooms.map((r: { id: number; name: string }) => r.name);
+                    const roomNames = mappedRooms.map(
+                        (r: { id: number; name: string }) => r.name,
+                    );
                     tryPushMessage(
                         `Verfügbare Räume: \n${roomNames.join(", ")}`,
                         "TEMPINFO",
-                        "System"
+                        "System",
                     );
                     break;
                 case "msg":
                     if (data.error !== null)
-                        tryPushMessage("Fehler beim Senden der Nachricht: " + data.error, "ERROR", "System");
-                    else if (data.result === null || data.result.length == 0){
+                        tryPushMessage(
+                            "Fehler beim Senden der Nachricht: " + data.error,
+                            "ERROR",
+                            "System",
+                        );
+                    else if (data.result === null || data.result.length == 0) {
                         break;
                     }
                 case "get_messages":
@@ -529,43 +591,77 @@ export default function Terminal() {
                     setMessages(
                         Array.isArray(data.result)
                             ? data.result.map((msg: any) => ({
-                                    id: msg.MessageID,
-                                    text: msg.Text ?? "",
-                                    kind: "IN",
-                                    sender: msg.Name ?? "unknown",
-                                    timestamp: msg.Time ? new Date(msg.Time.replace(" ", "T")) : new Date(),
-                                }))
-                            : []
+                                  id: msg.MessageID,
+                                  text: msg.Text ?? "",
+                                  kind: "IN",
+                                  sender: msg.Name ?? "unknown",
+                                  timestamp: msg.Time
+                                      ? new Date(msg.Time.replace(" ", "T"))
+                                      : new Date(),
+                              }))
+                            : [],
                     );
                     break;
                 case "login_as":
-                    if (data.error === null){
+                    if (data.error === null) {
                         setUser(data.result.username);
-                        tryPushMessage(`Gewechselt zu Nutzer ${data.result.username}.`, "INFO", "System");
-                        addUserToKnownList(data.result.user_id, data.result.username);
-                    }
-                    else tryPushMessage(`Fehler beim Wechsel des Nutzers: ${data.error}`, "ERROR", "System");
+                        tryPushMessage(
+                            `Gewechselt zu Nutzer ${data.result.username}.`,
+                            "INFO",
+                            "System",
+                        );
+                        addUserToKnownList(
+                            data.result.user_id,
+                            data.result.username,
+                        );
+                    } else
+                        tryPushMessage(
+                            `Fehler beim Wechsel des Nutzers: ${data.error}`,
+                            "ERROR",
+                            "System",
+                        );
                     break;
                 case "create_user":
-                    if (data.error === null){
+                    if (data.error === null) {
                         setUser(data.result.username);
-                        tryPushMessage(`Gewechselt zu neu ertelltem Nutzer '${data.result.username}'.`, "INFO", "System");
-                        addUserToKnownList(data.result.user_id, data.result.username);
-                    }
-                    else tryPushMessage(`Fehler bei der Erstellung des Nutzers: ${data.error}`, "ERROR", "System");
+                        tryPushMessage(
+                            `Gewechselt zu neu ertelltem Nutzer '${data.result.username}'.`,
+                            "INFO",
+                            "System",
+                        );
+                        addUserToKnownList(
+                            data.result.user_id,
+                            data.result.username,
+                        );
+                    } else
+                        tryPushMessage(
+                            `Fehler bei der Erstellung des Nutzers: ${data.error}`,
+                            "ERROR",
+                            "System",
+                        );
                     break;
                 case "nameof_user":
-                    if (data.error === null && data.result !== null){
-                        addUserToKnownList(data.result.user_id, data.result.username);
-                    }
-                    else throw new Error("Fehler beim Abrufen des Benutzernamens: " + data.error); //hintergrund abfrage muss nicht sichtbar sein
+                    if (data.error === null && data.result !== null) {
+                        addUserToKnownList(
+                            data.result.user_id,
+                            data.result.username,
+                        );
+                    } else
+                        throw new Error(
+                            "Fehler beim Abrufen des Benutzernamens: " +
+                                data.error,
+                        ); //hintergrund abfrage muss nicht sichtbar sein
                     break;
             }
-        }
+        };
 
         ws.current.onclose = () => {
             if (onlineFlag.current) {
-                pushMessage("Disconnected from Shello Server.", "INFO", "System");
+                pushMessage(
+                    "Disconnected from Shello Server.",
+                    "INFO",
+                    "System",
+                );
                 onlineFlag.current = false;
             }
             // Automatisch nach 3 Sekunden wieder verbinden
@@ -595,33 +691,45 @@ export default function Terminal() {
 
     function sendMessage(text: string) {
         // Nachricht an Server senden
-        ws.current?.send(JSON.stringify({ func: "msg", text: text, room_id: roomID }));
-    };
+        ws.current?.send(
+            JSON.stringify({ func: "msg", text: text, room_id: roomID }),
+        );
+    }
 
     function createUser(username: string) {
         // Nachricht an Server senden
-        ws.current?.send(JSON.stringify({ func: "create_user", username: username }));
-    };
+        ws.current?.send(
+            JSON.stringify({ func: "create_user", username: username }),
+        );
+    }
 
     function changeUser(username: string) {
         // Nachricht an Server senden
-        ws.current?.send(JSON.stringify({ func: "login_as", username: username }));
-    };
+        ws.current?.send(
+            JSON.stringify({ func: "login_as", username: username }),
+        );
+    }
 
     function getHistory() {
         // Nachricht an Server senden
-        ws.current?.send(JSON.stringify({ func: "get_messages", room_id: roomID }));
-    };
+        ws.current?.send(
+            JSON.stringify({ func: "get_messages", room_id: roomID }),
+        );
+    }
 
     function getRooms() {
         // Nachricht an Server senden
         ws.current?.send(JSON.stringify({ func: "get_rooms" }));
-    };
+    }
 
     function enterRoom(roomName: string) {
         const match = rooms.find((r) => r.name === roomName);
         if (!match) {
-            pushMessage(`Raum '${roomName}' nicht gefunden.`, "ERROR", "System");
+            pushMessage(
+                `Raum '${roomName}' nicht gefunden.`,
+                "ERROR",
+                "System",
+            );
             return;
         }
         setRoom([match.id, match.name]);
@@ -637,14 +745,13 @@ export default function Terminal() {
     // Auto-Hide für Error-Popover nach 20 Sekunden
     useEffect(() => {
         if (!popoverText) return;
-        
+
         const timer = setTimeout(() => {
             setPopoverText("");
         }, 20000);
-        
+
         return () => clearTimeout(timer);
     }, [popoverText]);
-
 
     function pushMessage(text: string, kind: string, sender: string) {
         if (kind === "CLEAR") {
@@ -660,25 +767,37 @@ export default function Terminal() {
         //Neue Nachricht anhängen, aber vorher aufräumen
         setMessages((m) => {
             let updated = [...m];
-            
+
             // Wenn kind der aktuellen Nachricht INFO oder OUT ist, lösche alle COMMAND, ERROR und TEMPINFO
             if (kind === "INFO" || kind === "OUT" || kind === "IN") {
-                updated = updated.filter((msg) => 
-                    msg.kind !== "COMMAND" && msg.kind !== "ERROR" && msg.kind !== "TEMPINFO"
+                updated = updated.filter(
+                    (msg) =>
+                        msg.kind !== "COMMAND" &&
+                        msg.kind !== "ERROR" &&
+                        msg.kind !== "TEMPINFO",
                 );
             }
-            
+
             if (kind !== "OUT")
-                return [...updated, { id: idRef.current++, text, kind, sender: (kind !== "IN" && kind !== "OUT") ? "System" : user, timestamp: new Date() }];
-            else 
-                return updated;
+                return [
+                    ...updated,
+                    {
+                        id: idRef.current++,
+                        text,
+                        kind,
+                        sender:
+                            kind !== "IN" && kind !== "OUT" ? "System" : user,
+                        timestamp: new Date(),
+                    },
+                ];
+            else return updated;
         });
     }
 
     function showPopover(text: string) {
         setPopoverText(text);
     }
-    
+
     /**
      * Zeigt eine System-Benachrichtigung an
      */
@@ -702,19 +821,24 @@ export default function Terminal() {
         try {
             // Kommando parsen
             const { cmd, args } = parseCommand(line);
-            
+
             // Handler suchen
             const handler = COMMANDS[cmd];
             if (!handler) throw new Error("Unbekannter Befehl: " + cmd);
-            
+
             // Handler ausführen mit Kontext
-            await handler(args, { 
-                user, 
-                setUser, 
-                pushMessage, createUser, changeUser, enterRoom, getRooms, getHistory,
+            await handler(args, {
+                user,
+                setUser,
+                pushMessage,
+                createUser,
+                changeUser,
+                enterRoom,
+                getRooms,
+                getHistory,
                 showSystemNotification,
                 themeColors,
-                setThemeColors
+                setThemeColors,
             });
         } catch (err: any) {
             // Fehler im Popover anzeigen
@@ -737,31 +861,32 @@ export default function Terminal() {
         } else if (e.key === "Tab") {
             // Bei Tab: Befehl vervollständigen
             e.preventDefault();
-            
+
             // Erstes Wort (vor Leerzeichen) extrahieren
             const cur = input.split(/\s+/)[0];
-            
+
             // Ersten passenden Befehl finden
             const match = commands.find((c) => c.startsWith(cur));
-            
+
             // Wenn gefunden: ersten Teil ersetzen
             if (match) setInput((s) => s.replace(/^[^\s]*/, match));
-        }else if (e.key === "ArrowUp") {
+        } else if (e.key === "ArrowUp") {
             e.preventDefault();
             if (commandHistory.length === 0) return;
-        
-            const newIndex = historyIndex === -1 
-                ? commandHistory.length - 1 
-                : Math.max(0, historyIndex - 1);
-        
+
+            const newIndex =
+                historyIndex === -1
+                    ? commandHistory.length - 1
+                    : Math.max(0, historyIndex - 1);
+
             setHistoryIndex(newIndex);
             setInputValue(commandHistory[newIndex]);
         } else if (e.key === "ArrowDown") {
             e.preventDefault();
             if (historyIndex === -1) return;
-        
+
             const newIndex = historyIndex + 1;
-        
+
             if (newIndex >= commandHistory.length) {
                 setHistoryIndex(-1);
                 setInputValue("");
@@ -771,15 +896,14 @@ export default function Terminal() {
             }
         }
     }
-    
+
     /**
      * Dummy-Handler für KeyUp (für Kompatibilität)
      */
     function handleKeyUp(e: React.KeyboardEvent<HTMLInputElement>) {
-      
         // KA wenn wer braucht ist da
-    };
-    
+    }
+
     /**
      * Sendet eine Nachricht (alternativer Handler für Button-Click)
      */
@@ -790,123 +914,203 @@ export default function Terminal() {
         }
     }
 
-    
-
     // === RENDER ===
     return (
-    <main className="flex justify-center h-screen w-full overflow-hidden" style={{ backgroundColor: themeColors.outerBgColor }}>
-      
-      {/* Container: Flex-Column, damit Input unten bleibt */}
-      <div className="w-full max-w-[80vw] h-full shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_10px_30px_-10px_rgba(0,0,0,0.6)] flex flex-col" style={{ backgroundColor: bgColor }}>
-        
-        {/* Header mit Kontaktname */}
-        <header className="p-4 border-b shrink-0" style={{ borderColor: themeColors.borderColor, backgroundColor: bgColor }}>
-          <div className="flex justify-center items-center relative">
-            <div>
-              <Character emotion={currentEmotion} />
-              <h1 className="text-lg font-semibold" style={{ color: textColor }}>
-                {roomLabel}
-              </h1>
+        <main
+            className="flex justify-center h-screen w-full overflow-hidden"
+            style={{ backgroundColor: themeColors.outerBgColor }}
+        >
+            {/* Container: Flex-Column, damit Input unten bleibt */}
+            <div
+                className="w-full max-w-[80vw] h-full shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_10px_30px_-10px_rgba(0,0,0,0.6)] flex flex-col"
+                style={{ backgroundColor: bgColor }}
+            >
+                {/* Header mit Kontaktname */}
+                <header
+                    className="p-4 border-b shrink-0"
+                    style={{
+                        borderColor: themeColors.borderColor,
+                        backgroundColor: bgColor,
+                    }}
+                >
+                    <div className="flex justify-center items-center relative">
+                        <div>
+                            <h1
+                                className="text-lg font-semibold"
+                                style={{ color: textColor }}
+                            >
+                                {roomLabel}
+                            </h1>
+                        </div>
+                        {/*TODO: Buttonicon zum tatsächlichen Shello-Logo ändern*/}
+                        <button
+                            onClick={() =>
+                                setSystemNotification(
+                                    systemNotification
+                                        ? ""
+                                        : lastSystemNotification,
+                                )
+                            }
+                            className="absolute right-0 px-2 py-1 rounded cursor-pointer transition-opacity hover:opacity-70"
+                            style={{ color: textColor }}
+                            aria-label="Toggle System-Benachrichtigung"
+                        >
+                            <Character emotion={currentEmotion} />
+                        </button>
+                    </div>
+                </header>
+
+                {/* System-Benachrichtigung mit Sprechblase */}
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 70,
+                        left: 0,
+                        right: 190,
+                        zIndex: 9999,
+                        pointerEvents: "none",
+                    }}
+                >
+                    <div
+                        style={{
+                            pointerEvents: systemNotification ? "auto" : "none",
+                        }}
+                    >
+                        <Popover
+                            text={systemNotification}
+                            variant="system"
+                            onClose={() => setSystemNotification("")}
+                            themeColors={{
+                                bgColor: themeColors.bgColor,
+                                textColor: themeColors.textColor,
+                                borderColor: themeColors.borderColor,
+                            }}
+                        />
+                    </div>
+                </div>
+
+                {/* Nachrichten-Bereich: Terminal Style */}
+                <div className="flex-1 overflow-y-auto p-6 font-mono text-sm">
+                    {messages.map((msg, i) => (
+                        <div
+                            key={i}
+                            className={`mb-2 flex ${msg.sender === username || msg.sender === "System" ? "justify-start" : "justify-end"}`}
+                        >
+                            <div
+                                className="max-w-[70%] break-words hyphens-auto"
+                                style={{ color: textColor }}
+                            >
+                                {msg.sender === username ? (
+                                    <>
+                                        <span
+                                            className="opacity-60 text-xs"
+                                            style={{ color: textColor }}
+                                        >
+                                            [
+                                            {msg.timestamp
+                                                ? msg.timestamp.toLocaleTimeString()
+                                                : ""}
+                                            ]{" "}
+                                        </span>
+                                        <span
+                                            className="font-bold"
+                                            style={{ color: textColor }}
+                                        >
+                                            {msg.sender}
+                                            <br />
+                                        </span>
+                                    </>
+                                ) : msg.sender !== "System" ? (
+                                    <div className="flex justify-end gap-1">
+                                        <span
+                                            className="font-bold"
+                                            style={{ color: textColor }}
+                                        >
+                                            {msg.sender}{" "}
+                                        </span>
+                                        <span
+                                            className="opacity-60 text-xs"
+                                            style={{ color: textColor }}
+                                        >
+                                            [
+                                            {msg.timestamp
+                                                ? msg.timestamp.toLocaleTimeString()
+                                                : ""}
+                                            ]
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <></>
+                                )}
+                                <span
+                                    className="break-words hyphens-auto whitespace-pre-wrap"
+                                    style={{
+                                        color:
+                                            msg.sender === "System"
+                                                ? systemTextColor
+                                                : textColor,
+                                    }}
+                                >
+                                    {msg.text}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Error-Popover über Eingabe */}
+                <Popover
+                    text={popoverText}
+                    onClose={() => setPopoverText("")}
+                    variant="error"
+                    themeColors={{
+                        bgColor: themeColors.bgColor,
+                        textColor: themeColors.textColor,
+                        borderColor: themeColors.borderColor,
+                    }}
+                />
+
+                {/* Eingabe-Bereich: Terminal Style */}
+                <div
+                    className="p-4 border-t shrink-0"
+                    style={{
+                        backgroundColor: bgColor,
+                        borderColor: themeColors.borderColor,
+                    }}
+                >
+                    <div className="flex gap-2 items-center font-mono">
+                        <span style={{ color: textColor }}>&gt;</span>
+                        <input
+                            type="text"
+                            className="flex-1 p-2 bg-transparent border-none focus:outline-none"
+                            style={{ color: textColor }}
+                            placeholder="Nachricht eingeben..."
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={onKeyDown}
+                            onKeyUp={handleKeyUp}
+                        />
+                        <button
+                            onClick={handleSendMessage}
+                            className="px-4 py-2 rounded font-sans text-sm transition-colors"
+                            style={{
+                                backgroundColor: textColor,
+                                color: bgColor,
+                            }}
+                            onMouseEnter={(e) =>
+                                (e.currentTarget.style.backgroundColor =
+                                    buttonHoverBgColor)
+                            }
+                            onMouseLeave={(e) =>
+                                (e.currentTarget.style.backgroundColor =
+                                    textColor)
+                            }
+                        >
+                            ↵
+                        </button>
+                    </div>
+                </div>
             </div>
-            {/*TODO: Buttonicon zum tatsächlichen Shello-Logo ändern*/}
-            <button
-              onClick={() => setSystemNotification(systemNotification ? "" : lastSystemNotification)}
-              className="absolute right-0 px-2 py-1 rounded border cursor-pointer transition-opacity hover:opacity-70"
-              style={{ color: textColor, borderColor: textColor }}
-              aria-label="Toggle System-Benachrichtigung"
-            >
-              ^_^
-            </button>
-          </div>
-        </header>
-
-        {/* System-Benachrichtigung mit Sprechblase */}
-        <div style={{ position: "fixed", top: 70, left: 0, right: 190, zIndex: 9999, pointerEvents: "none" }}>
-          <div style={{ pointerEvents: systemNotification ? "auto" : "none" }}>
-            <Popover 
-              text={systemNotification}
-              variant="system"
-              onClose={() => setSystemNotification("")}
-              themeColors={{
-                bgColor: themeColors.bgColor,
-                textColor: themeColors.textColor,
-                borderColor: themeColors.borderColor
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Nachrichten-Bereich: Terminal Style */}
-        <div className="flex-1 overflow-y-auto p-6 font-mono text-sm">
-          {messages.map((msg, i) => (
-            <div 
-              key={i} 
-              className={`mb-2 flex ${(msg.sender === username || msg.sender === "System") ? 'justify-start' : 'justify-end'}`}
-            >
-              <div className="max-w-[70%] break-words hyphens-auto" style={{ color: textColor }}>
-                {msg.sender === username ? (
-                  <>
-                    <span className="opacity-60 text-xs" style={{ color: textColor }}>[{msg.timestamp ? msg.timestamp.toLocaleTimeString() : ""}] </span>
-                    <span className="font-bold" style={{ color: textColor }}>{msg.sender}<br /></span>
-                  </>
-                ) : msg.sender !== "System" ? (
-                  <div className="flex justify-end gap-1">
-                    <span className="font-bold" style={{ color: textColor }}>{msg.sender} </span>
-                    <span className="opacity-60 text-xs" style={{ color: textColor }}>
-                        [{msg.timestamp ? msg.timestamp.toLocaleTimeString() : ""}]
-                    </span>
-                  </div>
-                ) : (
-                  <></>
-                )}
-                <span className="break-words hyphens-auto whitespace-pre-wrap" style={{ color: (msg.sender === "System" ? systemTextColor : textColor) }}>{msg.text}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Error-Popover über Eingabe */}
-        <Popover
-          text={popoverText}
-          onClose={() => setPopoverText("")}
-          variant="error"
-          themeColors={{
-            bgColor: themeColors.bgColor,
-            textColor: themeColors.textColor,
-            borderColor: themeColors.borderColor
-          }}
-        />
-
-        {/* Eingabe-Bereich: Terminal Style */}
-        <div className="p-4 border-t shrink-0" style={{ backgroundColor: bgColor, borderColor: themeColors.borderColor }}>
-          <div className="flex gap-2 items-center font-mono">
-            <span style={{ color: textColor }}>&gt;</span>
-            <input
-              type="text"
-              className="flex-1 p-2 bg-transparent border-none focus:outline-none"
-              style={{ color: textColor }}
-              placeholder="Nachricht eingeben..."
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={onKeyDown}
-              onKeyUp={handleKeyUp}
-            />
-            <button
-              onClick={handleSendMessage}
-              className="px-4 py-2 rounded font-sans text-sm transition-colors"
-              style={{ 
-                backgroundColor: textColor, 
-                color: bgColor
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = buttonHoverBgColor}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = textColor}
-            >
-              ↵
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </main>
-  );
+        </main>
+    );
 }
