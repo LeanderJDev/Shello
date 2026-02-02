@@ -3,3 +3,7 @@
 
 # Python cache
 *.pyc
+
+server.log
+
+.venv/

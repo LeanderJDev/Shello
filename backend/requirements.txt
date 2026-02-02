@@ -1,2 +1,4 @@
 dotenv
 sockets
+requests
+websockets

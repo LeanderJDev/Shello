@@ -29,8 +29,8 @@ class DatabaseClient:
             r = requests.get(
                 f"{self.api_url+endpoint}", headers={"api-key": self.api_key}
             )
-            #r.raise_for_status()
-            #print(r.json());
+            # r.raise_for_status()
+            # print(r.json());
             return r.json()
         if method == "POST":
             r = requests.post(
@@ -38,8 +38,8 @@ class DatabaseClient:
                 headers={"api-key": self.api_key, "Content-Type": "application/json"},
                 json=body,
             )
-            #r.raise_for_status()  # Might need to parse response message
-            #print(r.json());
+            # r.raise_for_status()  # Might need to parse response message
+            # print(r.json());
             return r.json()
         raise ValueError("Unsupported HTTP method: " + method)
 
@@ -71,29 +71,29 @@ class DatabaseClient:
         data = {"RoomID": room_id, "Name": new_name}
         room = self.request(f"/rooms", method="PATCH", body=data)
         return room
-    
+
     def get_user_by_name(self, username):
         users = self.request(f"/user", method="GET")
         if users and not users[0].get("error"):
             for user in users:
                 if user.get("Name") == username:
-                    return { "user_id": user.get("ID"), "username": user.get("Name") }
-        return { "error": "user not found" }
-    
+                    return {"user_id": user.get("ID"), "username": user.get("Name")}
+        return {"error": "user not found"}
+
     def get_user_by_ID(self, user_id):
         users = self.request(f"/user", method="GET")
         if users and not users[0].get("error"):
             for user in users:
                 if user.get("ID") == user_id:
-                    return { "user_id": user.get("ID"), "username": user.get("Name") }
-        return { "error": "user not found" }
+                    return {"user_id": user.get("ID"), "username": user.get("Name")}
+        return {"error": "user not found"}
 
 
 async def handle_client(websocket, dbClient):
     """Handle a single WebSocket client connection"""
     print(f"Client connected: {websocket.remote_address}")
-    
-    user_id = 0 # logged in as guest by default
+
+    user_id = 0  # logged in as guest by default
 
     try:
         async for message in websocket:
@@ -101,12 +101,12 @@ async def handle_client(websocket, dbClient):
                 # Parse incoming JSON message
                 data = json.loads(message)
                 print(f"Received: {data}")
-                
+
                 # zeugs verarbeiten
                 func = data.get("func", "")
                 result: dict | None = None
                 error = None
-                                
+
                 match func:
                     case "create_user":
                         username = data.get("username").strip()
@@ -117,15 +117,18 @@ async def handle_client(websocket, dbClient):
                         else:
                             db_result = dbClient.create_user(username)
                             if db_result is not None and db_result.get("error") is None:
-                                result = {"username": db_result.get("Username"), "user_id": db_result.get("ID")}
-                    
+                                result = {
+                                    "username": db_result.get("Username"),
+                                    "user_id": db_result.get("ID"),
+                                }
+
                     case "create_room":
                         room_name = data.get("room_name").strip()
                         if not room_name:
                             error = "room_name required"
                         else:
                             result = dbClient.create_room(user_id, room_name)
-                    
+
                     case "msg":
                         room_id = data.get("room_id")
                         text = data.get("text").strip()
@@ -137,17 +140,17 @@ async def handle_client(websocket, dbClient):
                             result = dbClient.create_message(user_id, room_id, text)
                             if result is not None and result.get("error") is None:
                                 result = dbClient.get_messages(room_id)
-                    
+
                     case "get_rooms":
                         result = dbClient.get_rooms()
-                    
+
                     case "get_messages":
                         room_id = data.get("room_id")
                         if not room_id:
                             error = "room_id required"
                         else:
                             result = dbClient.get_messages(room_id)
-                    
+
                     case "edit_room_name":
                         room_id = data.get("room_id")
                         new_name = data.get("new_name").strip()
@@ -181,46 +184,48 @@ async def handle_client(websocket, dbClient):
 
                     case _:
                         error = f"Unknown function: {func}"
-                
+
                 print(f"Result: {result}, Error: {error}")
                 try:
-                    if error is None and result is not None and result.get("error") is not None:
+                    if (
+                        error is None
+                        and result is not None
+                        and result.get("error") is not None
+                    ):
                         error = result.get("error")
                         result = None
                 except AttributeError:
                     pass
-                
+
                 # Echo back with result
                 response = {
                     "result": result,
                     "error": error,
                     "status": "error" if error else "ok",
-                    "response": func
+                    "response": func,
                 }
-                
+
                 await websocket.send(json.dumps(response))
-                
+
             except json.JSONDecodeError as e:
                 error_msg = {"error": "Invalid JSON", "status": "error"}
                 await websocket.send(json.dumps(error_msg))
-                
+
     except websockets.exceptions.ConnectionClosed:
         print(f"Client disconnected: {websocket.remote_address}")
 
 
 async def main(serverPort, apiKey, apiUrl):
     dbClient = DatabaseClient(apiUrl, apiKey)
-    
+
     try:
         rooms = dbClient.get_rooms()
         print("Connected to database, available rooms:", len(rooms) if rooms else 0)
     except Exception as e:
         print(f"Warning: Could not connect to database: {e}")
-    
+
     async with websockets.serve(
-        lambda ws: handle_client(ws, dbClient),
-        "localhost",
-        serverPort
+        lambda ws: handle_client(ws, dbClient), "localhost", serverPort
     ):
         print(f"WebSocket server running on ws://localhost:{serverPort}/ws")
         await asyncio.Future()  # run forever
@@ -278,13 +283,20 @@ if __name__ == "__main__":
     SHELLO_API_KEY = os.getenv("SHELLO_API_KEY")
     if not SHELLO_API_KEY:
         print("Warning: SHELLO_API_KEY not set in environment")
+        raise ValueError(
+            "SHELLO_API_KEY not set in environment, please create a .env file"
+        )
 
     SHELLO_API_URL = os.getenv("SHELLO_API_URL")
     if not SHELLO_API_URL:
         print("Warning: SHELLO_API_URL not set in environment")
+        raise ValueError(
+            "SHELLO_API_URL not set in environment, please create a .env file"
+        )
+    print(f"Connecting to API URL: {SHELLO_API_URL}")
 
     serverPort = 12000
-    
+
     try:
         asyncio.run(main(serverPort, SHELLO_API_KEY, SHELLO_API_URL))
     except KeyboardInterrupt:
