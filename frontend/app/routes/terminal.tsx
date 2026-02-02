@@ -816,6 +816,15 @@ export default function Terminal() {
     async function handleCommandLine(line: string) {
         // Leere Zeilen ignorieren
         if (!line.trim()) return;
+
+        // Befehl zur Historie hinzufügen (wenn nicht identisch mit letztem)
+        const lastCommand = commandHistory[commandHistory.length - 1];
+        if (line !== lastCommand) {
+            setCommandHistory((prev) => [...prev, line]);
+        }
+
+        setHistoryIndex(-1);
+
         pushMessage(`> ${line}`, "COMMAND", "System");
 
         try {
