@@ -1,7 +1,9 @@
 import type { Route } from "./+types/terminal";
 import Input from "../components/input";
 import Popover from "../components/popover";
+import Character from "~/components/character/Character";
 import { useState, useRef, useEffect } from "react";
+import { EmotionKey } from "~/components/character/types";
 
 export function meta({}: Route.MetaArgs) {
     return [
@@ -414,6 +416,18 @@ export default function Terminal() {
     // Referenz zum Messages-Container (für Auto-Scroll)
     const messagesRef = useRef<HTMLDivElement | null>(null);
 
+    // cycle through available emotions
+    const emotionKeys = Object.values(EmotionKey) as EmotionKey[];
+    const [emotionIndex, setEmotionIndex] = useState(0);
+    const currentEmotion = emotionKeys[emotionIndex % emotionKeys.length];
+
+    useEffect(() => {
+        const id = setInterval(() => {
+            setEmotionIndex((i) => (i + 1) % emotionKeys.length);
+        }, 2200);
+        return () => clearInterval(id);
+    }, [emotionKeys.length]);
+
     const [[roomID, roomName], setRoom] = useState<[number, string]>([-1, "null"]);
     const [rooms, setRooms] = useState<{ id: number; name: string; }[]>([]);
 
@@ -789,6 +803,7 @@ export default function Terminal() {
         <header className="p-4 border-b shrink-0" style={{ borderColor: themeColors.borderColor, backgroundColor: bgColor }}>
           <div className="flex justify-center items-center relative">
             <div>
+              <Character emotion={currentEmotion} />
               <h1 className="text-lg font-semibold" style={{ color: textColor }}>
                 {roomLabel}
               </h1>
