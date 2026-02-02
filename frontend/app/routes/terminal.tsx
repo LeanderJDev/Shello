@@ -999,7 +999,30 @@ export default function Terminal() {
                 </div>
 
                 {/* Nachrichten-Bereich: Terminal Style */}
-                <div className="flex-1 overflow-y-auto p-6 font-mono text-sm">
+                <div
+                    className="flex-1 overflow-y-auto p-6 font-mono text-sm"
+                    style={{
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: `${themeColors.textColor} ${themeColors.bgColor}`,
+                    }}
+                >
+                    <style>{`
+                        .flex-1.overflow-y-auto::-webkit-scrollbar {
+                            width: 12px;
+                        }
+                        .flex-1.overflow-y-auto::-webkit-scrollbar-track {
+                            background: ${themeColors.bgColor};
+                            border-left: 1px solid ${themeColors.borderColor};
+                        }
+                        .flex-1.overflow-y-auto::-webkit-scrollbar-thumb {
+                            background: ${themeColors.textColor};
+                            border-radius: 6px;
+                            border: 2px solid ${themeColors.bgColor};
+                        }
+                        .flex-1.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+                            background: ${themeColors.buttonHoverBgColor};
+                        }
+                    `}</style>
                     {messages.map((msg, i) => (
                         <div
                             key={i}
