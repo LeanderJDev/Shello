@@ -2,91 +2,89 @@
 
 ## Overview
 
--   DatabaseClient: Manages interactions with the database.
--   SocketServer: Handles real-time communication with clients.
+- DatabaseClient: Manages interactions with the database.
+- SocketServer: Handles real-time communication with clients.
 
 ## DatabaseClient
 
-Handles requests to REST API of provided database.
+Handles requests to the REST API of the provided database. There are two different DatabaseClient implementations in the repo with slightly different behaviours; tests and the WebSocket server use different variants (see below).
 
-There are three endpoints:
+Endpoints (API):
 
--   `/rooms`: for managing chat rooms.
-    -   GET: Retrieve all chat rooms.
-    -   POST: Create a new chat room.
--   `/user`: for managing user data.
-    -   POST: Create a new user.
-    -   GET: Read available users
-    -   PATCH: Update username
-    -   DELETE: Delete user
--   `/messages`: for managing chat messages.
-    -   GET: Retrieve messages for a specific room.
-    -   POST: Send a new message to a room.
--   `/readconfirmation`: (optional)
-    -   POST: Create read confirmation for user and message
-        -GET: Get read confirmations for message
+- `/rooms` — manage chat rooms (GET, POST, PATCH, DELETE)
+- `/user` — manage users (GET, POST, PATCH, DELETE)
+- `/messages` — manage messages (GET, POST, DELETE)
+- `/readconfirmation` — optional read receipts (POST, GET)
 
-These get wrapped in methods of the `DatabaseClient`
+Available methods (summary) — see concrete implementations in source files for exact return types:
 
-Available DatabaseClient methods (summary)
+- create_user(username)
+- get_users() / get_user(user_id)
+- change_user(user_id, new_name)
+- delete_user(user_id)
+- create_room(user_id, room_name)
+- get_rooms()
+- change_room(room_id, new_name)
+- delete_room(room_id)
+- create_message(user_id, room_id, content)
+- get_messages(room_id)
+- delete_message(message_id)
+- post_readconfirmation(message_id, user_id)
+- get_readconfirmation(message_id)
 
--   create_user(username)
--   get_users() / get_user(user_id)
--   change_user(user_id, new_name)
--   delete_user(user_id)
--   create_room(user_id, room_name)
--   get_rooms()
--   change_room(room_id, new_name)
--   delete_room(room_id)
--   create_message(user_id, room_id, content)
--   get_messages(room_id)
--   delete_message(message_id)
--   post_readconfirmation(message_id, user_id)
--   get_readconfirmation(message_id)
+Concrete implementations
+
+- [backend/database.py](backend/database.py): a test-oriented client. It calls `requests.request` with `raise_for_status()` and returns simplified values useful for tests:
+    - `create_user(...)` → returns numeric `ID` (or `None`).
+    - `create_room(...)` → returns numeric `ID`.
+    - `create_message(...)` → returns `True` on success (checks returned JSON message field).
+    - Additional helpers: `get_users`, `get_user`, `change_user`, `delete_*`, `post_readconfirmation`, `get_readconfirmation`.
+
+- [backend/server.py](backend/server.py): an embedded DatabaseClient used by the WebSocket server. It performs `requests.get`/`post` and returns raw parsed JSON (no `raise_for_status`). The WebSocket server code expects JSON objects with keys such as `Username` and `ID` when creating/reading users.
+
+Notes about return types and error handling
+
+- The two clients return different shapes (IDs/booleans vs raw dicts). Code using them must expect the correct return types.
+- `backend/database.py` is stricter (raises on HTTP errors) while `backend/server.py`'s client is permissive and returns raw JSON; server-side code checks for an `error` key in responses.
 
 ## SocketServer
 
-Handles real-time communication with clients using WebSockets.
+Handles WebSocket communication using a request/response JSON protocol (implemented in [backend/server.py](backend/server.py)).
 
-Incoming events (Client → Server)
+Message format (client → server):
 
--   `create_user` — payload: { username } → reply with created user id.
--   `switch_user` — payload: { userId } → switch current identity for the socket.
--   `get_rooms` — no payload → reply list of rooms.
--   `create_room` — payload: { userId, roomName } → reply room id.
--   `join_room` / `leave_room` — payload: { roomId, userId } → server manages socket → room mapping.
--   `send_message` — payload: { roomId, userId, text } → server stores message and emits to room.
--   `get_messages` — payload: { roomId } → reply messages for room.
--   `change_user` / `delete_user` — payloads for updating/deleting users.
--   `change_room` / `delete_room` — payloads for updating/deleting rooms.
--   `post_readconfirmation` / `get_readconfirmation` — optional read receipts.
+- JSON object with a `func` field, e.g. `{ "func": "create_user", "username": "Alice" }`.
 
-Outgoing events (Server → Clients)
+Server reply format:
 
--   `new_message` — emitted to a room when a message is created.
--   `user_joined` / `user_left` — notify room members on joins/leaves.
--   `room_created` / `room_updated` / `room_deleted` — notify relevant clients.
--   `user_updated` / `user_deleted` — notify relevant clients.
--   `message_deleted` — notify room.
--   `readconfirmation_updated` — notify room/author.
--   `error` / `ack` — direct replies to requesters.
+- `{ "result": <object|null>, "error": <string|null>, "status": "ok"|"error", "response": "<func>" }`
 
-Design notes
+Implemented `func` actions (current implementation in [backend/server.py](backend/server.py)):
 
--   The SocketServer should keep a mapping room → set(sockets) and only forward room-specific events to those sockets (multicast).
--   Server-side authorization: verify API key / membership before performing DB actions (do not trust client-supplied room membership).
--   DatabaseClient calls should reply to the requester and trigger broadcasts where appropriate (e.g., after create_message).
--   For development the DatabaseClient supports both REST backends and a local SQLite file (see code).
+- `create_user` — payload: `{ "username": "..." }`. Validates username (non-empty, not "guest"); uses DB API to create user; returns `{ "username": ..., "user_id": ... }` on success.
+- `create_room` — payload: `{ "room_name": "..." }`. Creates a room via DB and returns DB response.
+- `msg` — payload: `{ "room_id": <id>, "text": "..." }`. Posts a message; on success the server returns the messages for that room.
+- `get_rooms` — no payload. Returns list of rooms.
+- `get_messages` — payload: `{ "room_id": <id> }`. Returns messages for the room.
+- `edit_room_name` — payload: `{ "room_id": <id>, "new_name": "..." }`. Updates room name.
+- `login_as` — payload: `{ "username": "..." }`. Looks up user by name and sets the session `user_id` for that socket.
+- `nameof_user` — payload: `{ "user_id": <id> }`. Returns username info for the given ID.
+
+Differences from previous README design / important notes
+
+- No multicast/broadcast: the current server implementation replies only to the requesting client. There is no mapping of `room -> sockets` and no `new_message` / `user_joined` broadcast implementation yet.
+- Path vs host: the server code binds to `localhost` and a port via `websockets.serve(..., "localhost", port)`. The code prints `ws://localhost:<port>/ws` but does not enforce the `/ws` path.
+- Error handling: server expects DB responses to possibly contain an `error` field; it converts DB errors into the `error` field of its own replies.
 
 Running & env
 
--   Required env vars (load via .env): SHELLO_API_URL, SHELLO_API_KEY, SHELLO_WS_PORT (optional)
--   For slow external APIs, configure timeouts and measure request durations.
+- Required env vars (load via .env): `SHELLO_API_URL`, `SHELLO_API_KEY`, `SHELLO_WS_PORT` (optional). The server prints a message with the host and port it listens on (default port in code: 12000).
 
 Testing
 
--   A small integration tester (api_test.py) exists to exercise REST endpoints and measure latency; the SocketServer should use the same DatabaseClient methods to keep behaviour consistent.
+- A small integration tester (`api_test.py`) exists to exercise REST endpoints and measure latency; `backend/database.py` is written to be used by tests. The WebSocket server uses its embedded DatabaseClient variant — verify return shapes when integrating tests with the live server.
 
-Implementation option
+Summary
 
--   You may implement a minimal SocketServer using Python's `websockets` or `asyncio` or use a higher-level lib (socket.io) if cross-language clients are needed.
+- The README previously described a richer socket API including broadcasts and room membership multicast. The current implementation provides a smaller request/response WebSocket API (see implemented `func` list above) and uses two DatabaseClient variants with different return shapes (`backend/database.py` for tests, `backend/server.py` for the WebSocket server).
+- See [backend/server.py](backend/server.py) and [backend/database.py](backend/database.py) for exact behaviour and return types.
