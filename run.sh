@@ -31,8 +31,10 @@ backend/.venv/bin/python -m pip install --upgrade pip >/dev/null
 backend/.venv/bin/python -m pip install -r backend/requirements.txt >/dev/null || true
 
 echo "Starting backend (logs -> backend/server.log)..."
-backend/.venv/bin/python backend/server.py > backend/server.log 2>&1 &
+cd backend
+.venv/bin/python server.py > server.log 2>&1 &
 BACKEND_PID=$!
+cd "$ROOT_DIR"
 
 # wait a short time and verify backend didn't exit immediately
 sleep 3

@@ -3,168 +3,451 @@ import asyncio
 import json
 from dotenv import load_dotenv
 import websockets
+import traceback
 
 from database import DatabaseClient
+from shello_logging import setup_logging, log_with
+from logging import INFO, ERROR
+
+# in-memory room -> set(websocket) and socket -> set(room)
+room_sockets = {}
+socket_rooms = {}
+
+# initialize logger with fallback
+logger = None
+try:
+    logger = setup_logging()
+except Exception as e:
+    # fallback: print to stderr; logger remains None so safe_log prints
+    print(f"Warning: failed to initialize structured logger: {e}", flush=True)
 
 
-async def handle_client(websocket, dbClient):
+def safe_log(
+    level,
+    *,
+    event=None,
+    socket=None,
+    payload=None,
+    result=None,
+    error=None,
+    audience=None,
+):
+    # Use structured logger if available, otherwise fallback to stderr
+    try:
+        if logger:
+            log_with(
+                logger,
+                level,
+                socket=socket,
+                event=event,
+                payload=payload,
+                result=result,
+                error=error,
+                audience=audience,
+            )
+        else:
+            ts = __import__("datetime").datetime.utcnow().isoformat() + "Z"
+            print(
+                f"{ts} {level} event={event} socket={socket} payload={payload} result={result} error={error} audience={audience}",
+                flush=True,
+            )
+    except Exception:
+        # last resort
+        print(
+            f"Logging failure for event={event}: {traceback.format_exc()}", flush=True
+        )
+
+
+def add_socket_to_room(ws, room_id: int):
+    room = room_sockets.setdefault(int(room_id), set())
+    room.add(ws)
+    socket_rooms.setdefault(ws, set()).add(int(room_id))
+
+
+def remove_socket_from_room(ws, room_id: int):
+    r = room_sockets.get(int(room_id))
+    if r and ws in r:
+        r.discard(ws)
+    s = socket_rooms.get(ws)
+    if s and int(room_id) in s:
+        s.discard(int(room_id))
+
+
+async def broadcast_event(room_id: int, event: str, payload: dict):
+    sockets = list(room_sockets.get(int(room_id), set()))
+    audience = len(sockets)
+    if audience == 0:
+        log_with(
+            logger,
+            INFO,
+            socket=None,
+            event=event,
+            payload=payload,
+            result="no listeners",
+            audience=0,
+        )
+        return
+    msg = json.dumps({"event": event, "payload": payload})
+    for s in sockets:
+        try:
+            await s.send(msg)
+        except Exception as e:
+            log_with(
+                logger,
+                ERROR,
+                socket=str(getattr(s, "remote_address", "-")),
+                event=event,
+                payload=payload,
+                error=str(e),
+            )
+    log_with(
+        logger,
+        INFO,
+        socket=None,
+        event=event,
+        payload=payload,
+        result="broadcast sent",
+        audience=audience,
+    )
+
+
+async def emit_event(ws, event: str, payload: dict):
+    try:
+        await ws.send(json.dumps({"event": event, "payload": payload}))
+        log_with(
+            logger,
+            INFO,
+            socket=str(getattr(ws, "remote_address", "-")),
+            event=event,
+            payload=payload,
+            result="sent",
+        )
+    except Exception as e:
+        log_with(
+            logger,
+            ERROR,
+            socket=str(getattr(ws, "remote_address", "-")),
+            event=event,
+            payload=payload,
+            error=str(e),
+        )
+
+
+async def handle_client(websocket, dbClient: DatabaseClient):
     """Handle a single WebSocket client connection"""
-    print(f"Client connected: {websocket.remote_address}")
+    remote = websocket.remote_address
+    log_with(
+        logger,
+        INFO,
+        socket=str(remote),
+        event="connect",
+        payload=None,
+        result="connected",
+    )
 
-    user_id = 0  # logged in as guest by default
+    user_id = 0  # guest by default
 
     try:
         async for message in websocket:
             try:
-                # Parse incoming JSON message
                 data = json.loads(message)
-                print(f"Received: {data}")
+            except json.JSONDecodeError:
+                await websocket.send(
+                    json.dumps({"error": "Invalid JSON", "status": "error"})
+                )
+                continue
 
-                # zeugs verarbeiten
-                func = data.get("func", "")
-                result: dict | None = None
-                error = None
+            func = data.get("func", "")
+            log_with(
+                logger,
+                INFO,
+                socket=str(remote),
+                event="received",
+                payload={"func": func, "data": data},
+            )
 
-                match func:
-                    case "create_user":
-                        username = (data.get("username") or "").strip()
-                        if not username or username.strip().lower() == "guest":
-                            error = "username required"
-                        else:
-                            try:
-                                exists = dbClient.get_user_by_name(username)
-                            except Exception as e:
-                                error = f"db error: {e}"
-                                exists = {"error": "lookup failed"}
-                            if exists and exists.get("error") is None:
-                                error = "user already exists"
-                            else:
-                                try:
-                                    new_id = dbClient.create_user(username)
-                                except Exception as e:
-                                    error = f"db error: {e}"
-                                    new_id = None
-                                if new_id:
-                                    result = {"username": username, "user_id": new_id}
+            result = None
+            error = None
 
-                    case "create_room":
-                        room_name = (data.get("room_name") or "").strip()
-                        if not room_name:
-                            error = "room_name required"
-                        else:
-                            try:
-                                result = dbClient.create_room(user_id, room_name)
-                            except Exception as e:
-                                error = f"db error: {e}"
-
-                    case "msg":
-                        room_id = data.get("room_id")
-                        text = (data.get("text") or "").strip()
-                        if not room_id or not text:
-                            error = "room_id and text required"
-                        elif room_id == -1:
-                            error = "No room selected."
-                        else:
-                            try:
-                                ok = dbClient.create_message(user_id, room_id, text)
-                            except Exception as e:
-                                error = f"db error: {e}"
-                                ok = False
-                            if not error and ok:
-                                try:
-                                    result = dbClient.get_messages(room_id)
-                                except Exception as e:
-                                    error = f"db error: {e}"
-
-                    case "get_rooms":
+            # dispatch
+            if func in ("msg", "send_message"):
+                # send message and broadcast
+                room_id = data.get("room_id")
+                text = (data.get("text") or "").strip()
+                if not room_id or not text:
+                    error = "room_id and text required"
+                else:
+                    try:
+                        ok = dbClient.create_message(user_id, room_id, text)
+                    except Exception as e:
+                        error = f"db error: {e}"
+                        ok = False
+                    if ok:
                         try:
-                            result = dbClient.get_rooms()
+                            messages = dbClient.get_messages(room_id)
+                            result = messages
                         except Exception as e:
                             error = f"db error: {e}"
-
-                    case "get_messages":
-                        room_id = data.get("room_id")
-                        if not room_id:
-                            error = "room_id required"
-                        else:
-                            try:
-                                result = dbClient.get_messages(room_id)
-                            except Exception as e:
-                                error = f"db error: {e}"
-
-                    case "edit_room_name":
-                        room_id = data.get("room_id")
-                        new_name = (data.get("new_name") or "").strip()
-                        if not room_id or not new_name:
-                            error = "room_id and new_name required"
-                        else:
-                            try:
-                                result = dbClient.edit_room_name(room_id, new_name)
-                            except Exception as e:
-                                error = f"db error: {e}"
-
-                    case "login_as":
-                        username = (data.get("username") or "").strip()
-                        if not username:
-                            error = "username required"
-                            break
+                            result = None
+                        # broadcast new_message with last message if available
                         try:
-                            user = dbClient.get_user_by_name(username)
+                            last = (
+                                messages[-1]
+                                if isinstance(messages, list) and messages
+                                else None
+                            )
+                            await broadcast_event(
+                                room_id, "new_message", {"message": last}
+                            )
+                        except Exception as e:
+                            log_with(
+                                logger,
+                                ERROR,
+                                socket=str(remote),
+                                event="broadcast_new_message",
+                                payload={"room_id": room_id},
+                                error=str(e),
+                            )
+
+            elif func == "create_user":
+                username = (data.get("username") or "").strip()
+                if not username or username.lower() == "guest":
+                    error = "username required"
+                else:
+                    try:
+                        exists = dbClient.get_user_by_name(username)
+                    except Exception as e:
+                        error = f"db error: {e}"
+                        exists = {"error": "lookup failed"}
+                    if exists and exists.get("error") is None:
+                        error = "user already exists"
+                    else:
+                        try:
+                            new_id = dbClient.create_user(username)
                         except Exception as e:
                             error = f"db error: {e}"
-                            user = {"error": "lookup failed"}
-                        if user and user.get("error") is None:
-                            user_id = user.get("user_id")
-                            result = user
-                        else:
-                            error = "User not found."
+                            new_id = None
+                        if new_id:
+                            result = {"username": username, "user_id": new_id}
 
-                    case "nameof_user":
-                        _user_id = data.get("user_id")
-                        if not _user_id:
-                            error = "user_id required"
-                            break
-                        try:
-                            user = dbClient.get_user_by_ID(_user_id)
-                        except Exception as e:
-                            error = f"db error: {e}"
-                            user = {"error": "lookup failed"}
-                        if user and user.get("error") is None:
-                            result = user
-                        else:
-                            error = "User not found."
+            elif func == "create_room":
+                room_name = (data.get("room_name") or "").strip()
+                if not room_name:
+                    error = "room_name required"
+                else:
+                    try:
+                        room_id = dbClient.create_room(user_id, room_name)
+                        result = {"room_id": room_id, "room_name": room_name}
+                        # broadcast room_created to all
+                        await broadcast_event(
+                            room_id,
+                            "room_created",
+                            {"room_id": room_id, "room_name": room_name},
+                        )
+                    except Exception as e:
+                        error = f"db error: {e}"
 
-                    case _:
-                        error = f"Unknown function: {func}"
-
-                print(f"Result: {result}, Error: {error}")
+            elif func == "get_rooms":
                 try:
-                    if (
-                        error is None
-                        and result is not None
-                        and result.get("error") is not None
-                    ):
-                        error = result.get("error")
-                        result = None
-                except AttributeError:
-                    pass
+                    result = dbClient.get_rooms()
+                except Exception as e:
+                    error = f"db error: {e}"
 
-                # Echo back with result
-                response = {
-                    "result": result,
-                    "error": error,
-                    "status": "error" if error else "ok",
-                    "response": func,
-                }
+            elif func == "get_messages":
+                room_id = data.get("room_id")
+                if not room_id:
+                    error = "room_id required"
+                else:
+                    try:
+                        result = dbClient.get_messages(room_id)
+                    except Exception as e:
+                        error = f"db error: {e}"
 
-                await websocket.send(json.dumps(response))
+            elif func == "edit_room_name":
+                room_id = data.get("room_id")
+                new_name = (data.get("new_name") or "").strip()
+                if not room_id or not new_name:
+                    error = "room_id and new_name required"
+                else:
+                    try:
+                        res = dbClient.edit_room_name(room_id, new_name)
+                        result = res
+                        await broadcast_event(
+                            room_id,
+                            "room_updated",
+                            {"room_id": room_id, "new_name": new_name},
+                        )
+                    except Exception as e:
+                        error = f"db error: {e}"
 
-            except json.JSONDecodeError as e:
-                error_msg = {"error": "Invalid JSON", "status": "error"}
-                await websocket.send(json.dumps(error_msg))
+            elif func == "join_room":
+                room_id = data.get("room_id")
+                join_user = data.get("user_id", user_id)
+                if not room_id:
+                    error = "room_id required"
+                else:
+                    # optional: validate room exists
+                    try:
+                        rooms = dbClient.get_rooms()
+                        found = False
+                        if isinstance(rooms, list):
+                            for r in rooms:
+                                rid = r.get("ID") or r.get("id")
+                                if str(rid) == str(room_id):
+                                    found = True
+                                    break
+                        if not found:
+                            error = "room not found"
+                        else:
+                            add_socket_to_room(websocket, int(room_id))
+                            # get user info
+                            user = dbClient.get_user_by_ID(join_user)
+                            uname = (
+                                user.get("username")
+                                if user and not user.get("error")
+                                else None
+                            )
+                            await broadcast_event(
+                                room_id,
+                                "user_joined",
+                                {"user_id": join_user, "username": uname},
+                            )
+                            result = {"room_id": room_id}
+                    except Exception as e:
+                        error = f"db error: {e}"
+
+            elif func == "leave_room":
+                room_id = data.get("room_id")
+                leave_user = data.get("user_id", user_id)
+                if not room_id:
+                    error = "room_id required"
+                else:
+                    try:
+                        remove_socket_from_room(websocket, int(room_id))
+                        await broadcast_event(
+                            room_id, "user_left", {"user_id": leave_user}
+                        )
+                        result = {"room_id": room_id}
+                    except Exception as e:
+                        error = f"db error: {e}"
+
+            elif func == "login_as":
+                username = (data.get("username") or "").strip()
+                if not username:
+                    error = "username required"
+                else:
+                    try:
+                        user = dbClient.get_user_by_name(username)
+                    except Exception as e:
+                        error = f"db error: {e}"
+                        user = {"error": "lookup failed"}
+                    if user and user.get("error") is None:
+                        user_id = user.get("user_id")
+                        result = user
+                    else:
+                        error = "User not found."
+
+            elif func == "nameof_user":
+                _user_id = data.get("user_id")
+                if not _user_id:
+                    error = "user_id required"
+                else:
+                    try:
+                        user = dbClient.get_user_by_ID(_user_id)
+                    except Exception as e:
+                        error = f"db error: {e}"
+                        user = {"error": "lookup failed"}
+                    if user and user.get("error") is None:
+                        result = user
+                    else:
+                        error = "User not found."
+
+            elif func == "post_readconfirmation":
+                message_id = data.get("message_id") or data.get("MessageID")
+                rc_user = data.get("user_id", user_id)
+                if not message_id:
+                    error = "message_id required"
+                else:
+                    try:
+                        res = dbClient.post_readconfirmation(message_id, rc_user)
+                        result = res
+                        # broadcast readconfirmation_updated to room/author: best-effort
+                        try:
+                            await broadcast_event(
+                                None,
+                                "readconfirmation_updated",
+                                {"message_id": message_id, "user_id": rc_user},
+                            )
+                        except Exception:
+                            pass
+                    except Exception as e:
+                        error = f"db error: {e}"
+
+            elif func == "get_readconfirmation":
+                message_id = data.get("message_id") or data.get("MessageID")
+                if not message_id:
+                    error = "message_id required"
+                else:
+                    try:
+                        result = dbClient.get_readconfirmation(message_id)
+                    except Exception as e:
+                        error = f"db error: {e}"
+
+            else:
+                error = f"Unknown function: {func}"
+
+            # normalize possible DB error payloads
+            try:
+                if (
+                    error is None
+                    and result is not None
+                    and isinstance(result, dict)
+                    and result.get("error") is not None
+                ):
+                    error = result.get("error")
+                    result = None
+            except Exception:
+                pass
+
+            response = {
+                "result": result,
+                "error": error,
+                "status": "error" if error else "ok",
+                "response": func,
+            }
+            await websocket.send(json.dumps(response))
+            log_with(
+                logger,
+                INFO,
+                socket=str(remote),
+                event="response",
+                payload={"response": response},
+            )
 
     except websockets.exceptions.ConnectionClosed:
-        print(f"Client disconnected: {websocket.remote_address}")
+        log_with(
+            logger,
+            INFO,
+            socket=str(remote),
+            event="disconnect",
+            payload=None,
+            result="disconnected",
+        )
+        # cleanup socket from rooms
+        rooms = (
+            socket_rooms.get(websocket, set()).copy()
+            if socket_rooms.get(websocket)
+            else set()
+        )
+        for rid in rooms:
+            remove_socket_from_room(websocket, rid)
+            # broadcast leave
+            try:
+                asyncio.create_task(
+                    broadcast_event(rid, "user_left", {"user_id": user_id})
+                )
+            except Exception:
+                pass
 
 
 async def main(serverPort, apiKey, apiUrl):
@@ -177,60 +460,12 @@ async def main(serverPort, apiKey, apiUrl):
         print(f"Warning: Could not connect to database: {e}")
 
     async with websockets.serve(
-        lambda ws: handle_client(ws, dbClient),
-        serverPort["host"],
-        serverPort["port"],
+        lambda ws: handle_client(ws, dbClient), serverPort["host"], serverPort["port"]
     ):
         print(
             f"WebSocket server running on ws://{serverPort['host']}:{serverPort['port']}/ws"
         )
-        await asyncio.Future()  # run forever
-
-
-def testDatabaseAPI(apiKey, apiUrl):
-    dbClient = DatabaseClient(apiUrl, apiKey)
-
-    TEST_USER_NAME = "Test User"
-    TEST_ROOM_NAME = "Test Room"
-    TEST_MESSAGE_TEXT = "Hello World"
-
-    # 1. get existing rooms
-    rooms = dbClient.get_rooms()
-    print(f"Existing rooms: {rooms}")
-
-    # 2. create "Test User"
-    user_id = dbClient.create_user(TEST_USER_NAME)
-    if not user_id:
-        print("Failed to create user")
-        return
-
-    print(f"Created user ID: {user_id}")
-    # 3. create "Test Room"
-    room_id = dbClient.create_room(user_id, TEST_ROOM_NAME)
-    if not room_id:
-        print("Failed to create room")
-        return
-    print(f"Created room ID: {room_id}")
-    # 4. post "Hello World" message
-    message_success = dbClient.create_message(user_id, room_id, TEST_MESSAGE_TEXT)
-    if not message_success:
-        print("Failed to post message")
-        return
-    # 5. get messages in "Test Room"
-    messages = dbClient.get_messages(room_id)
-    print(f"Messages in room ID {room_id}: {messages}")
-    # 6. change room name
-    new_room_name = "Renamed Test Room"
-    dbClient.change_room(room_id, new_room_name)
-    print(f"Changed room ID {room_id} name to {new_room_name}")
-
-    # 7. delete created entities
-    dbClient.delete_message(messages[0].get("MessageID"))
-    print(f"Deleted message ID: {messages[0].get("MessageID")}")
-    dbClient.delete_room(room_id)
-    print(f"Deleted room ID: {room_id}")
-    dbClient.delete_user(user_id)
-    print(f"Deleted user ID: {user_id}")
+        await asyncio.Future()
 
 
 if __name__ == "__main__":
