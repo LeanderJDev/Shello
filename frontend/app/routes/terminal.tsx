@@ -639,7 +639,26 @@ export default function Terminal() {
                     case "message_deleted":
                         const mesg = messagesStateRef.current.find(msg => msg.id === data.payload.message_id);
                         console.log("message_deleted event received for id:", data.payload.message_id, "found message:", mesg);
-                        setMessages(prev => prev.filter(m => m.id !== data.payload.message_id));
+                        //setMessages(prev => prev.filter(m => m.id !== data.payload.message_id));
+                        //anstelle es zu löschen, als gelöscht markieren
+                        setMessages((m) => {
+                            let updated = [...m];
+
+                            //get msg to delete
+                            const msgToDelete = updated.findIndex(
+                                (msg) => msg.id === data.payload.message_id,
+                            
+                            );
+                            
+                            if (msgToDelete === -1) {
+                                console.warn("Message to delete not found:", data.payload.message_id);
+                                return updated; //keine änderung
+                            }
+
+                            updated[msgToDelete].text = "[Nachricht gelöscht]";
+                            updated[msgToDelete].kind = "INFO";
+                            return [...updated];
+                        });
                         break;
                 }
                 return; // Broadcast-Event behandelt
