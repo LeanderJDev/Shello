@@ -174,6 +174,7 @@ const COMMANDS: Record<string, CmdHandler> = {
         ctx.createRoom(roomName);
     },
 
+    //raum betreten
     accede: (args, ctx) => {
         if (!args[0]) throw new Error("enter: Raumname fehlt");
         ctx.pushMessage(
@@ -183,6 +184,8 @@ const COMMANDS: Record<string, CmdHandler> = {
         );
         ctx.enterRoom(args[0]);
     },
+
+    //alle räume anzeigen
     roomtour: (args, ctx) => {
         ctx.getRooms();
     },

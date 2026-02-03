@@ -145,7 +145,18 @@ async def handle_client(websocket, dbClient: DatabaseClient):
         result="connected",
     )
 
+    
     user_id = 0  # guest by default
+
+    users:dict = dbClient.get_users()
+    for u in users:
+        if not isinstance(u, dict):
+            continue
+        name = u.get("Name") or u.get("Username") or u.get("username")
+        uid = u.get("ID") or u.get("id") or u.get("UserID") or u.get("user_id")
+        if name == "guest":
+            user_id = uid
+            break
 
     try:
         async for message in websocket:
@@ -211,7 +222,7 @@ async def handle_client(websocket, dbClient: DatabaseClient):
 
             elif func == "create_user":
                 username = (data.get("username") or "").strip()
-                if not username or username.lower() == "guest":
+                if not username:
                     error = "username required"
                 else:
                     try:
