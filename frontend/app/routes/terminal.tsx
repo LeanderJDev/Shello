@@ -465,6 +465,7 @@ export default function Terminal() {
             kind?: string;
             sender: string;
             timestamp?: Date;
+            readBy?: number; // Anzahl der Personen, die die Nachricht gelesen haben
         }[]
     >([]);
 
@@ -598,9 +599,9 @@ export default function Terminal() {
                                     timestamp: msg.Time
                                         ? new Date(msg.Time.replace(" ", "T"))
                                         : new Date(),
-                                }
-                                
-                            );
+                                    readBy: msg.ReadBy ?? 0, // Anzahl der Leser vom Server
+                                },
+                            ]);
                         }
                         break;
                     case "room_created":
@@ -683,6 +684,7 @@ export default function Terminal() {
                                   timestamp: msg.Time
                                       ? new Date(msg.Time.replace(" ", "T"))
                                       : new Date(),
+                                  readBy: msg.ReadBy ?? 0, // Anzahl der Leser vom Server
                               }))
                             : [],
                     );
@@ -991,7 +993,8 @@ export default function Terminal() {
                     kind,
                     sender:
                         kind !== "IN" && kind !== "OUT" ? "System" : user,
-                    timestamp: timestamp ?? new Date(),
+                    timestamp: new Date(),
+                    readBy: kind === "OUT" ? 0 : undefined, // Nur für gesendete Nachrichten
                 },
             ];
         });
@@ -1247,71 +1250,134 @@ export default function Terminal() {
                             background: ${themeColors.buttonHoverBgColor};
                         }
                     `}</style>
-                    {messages.map((msg, i) => (
-                        <div
-                            key={i}
-                            className={`mb-2 flex ${msg.sender === username || msg.sender === "System" ? "justify-start" : "justify-end"}`}
-                        >
-                            <div
-                                className="max-w-[70%] break-words hyphens-auto"
-                                style={{ color: textColor }}
-                            >
-                                {msg.sender === username ? (
-                                    <>
-                                        <span
-                                            className="opacity-60 text-xs"
-                                            style={{ color: textColor }}
-                                        >
-                                            [
-                                            {msg.timestamp
-                                                ? msg.timestamp.toLocaleTimeString()
-                                                : ""}
-                                            ]{" "}
-                                        </span>
-                                        <span
-                                            className="font-bold"
-                                            style={{ color: textColor }}
-                                        >
-                                            {msg.sender}
-                                            <br />
-                                        </span>
-                                    </>
-                                ) : msg.sender !== "System" ? (
-                                    <div className="flex justify-end gap-1">
-                                        <span
-                                            className="font-bold"
-                                            style={{ color: textColor }}
-                                        >
-                                            {msg.sender}{" "}
-                                        </span>
-                                        <span
-                                            className="opacity-60 text-xs"
-                                            style={{ color: textColor }}
-                                        >
-                                            [
-                                            {msg.timestamp
-                                                ? msg.timestamp.toLocaleTimeString()
-                                                : ""}
-                                            ]
-                                        </span>
+                    {(() => {
+                        // Gruppiere Nachrichten nach Datum
+                        const groupedMessages: { date: string; messages: typeof messages }[] = [];
+                        let currentDate = "";
+                        let currentGroup: typeof messages = [];
+
+                        messages.forEach((msg) => {
+                            const msgDate = msg.timestamp
+                                ? msg.timestamp.toLocaleDateString("de-DE", {
+                                      year: "numeric",
+                                      month: "long",
+                                      day: "numeric",
+                                  })
+                                : "Unbekanntes Datum";
+
+                            if (msgDate !== currentDate) {
+                                if (currentGroup.length > 0) {
+                                    groupedMessages.push({ date: currentDate, messages: currentGroup });
+                                }
+                                currentDate = msgDate;
+                                currentGroup = [msg];
+                            } else {
+                                currentGroup.push(msg);
+                            }
+                        });
+
+                        // Letzte Gruppe hinzufügen
+                        if (currentGroup.length > 0) {
+                            groupedMessages.push({ date: currentDate, messages: currentGroup });
+                        }
+
+                        return groupedMessages.map((group, groupIndex) => (
+                            <div key={groupIndex}>
+                                {/* Datumstrennzeile */}
+                                <div className="flex items-center justify-center my-4">
+                                    <div
+                                        className="px-3 py-1 rounded text-xs font-semibold"
+                                        style={{
+                                            backgroundColor: themeColors.bgColor,
+                                            color: themeColors.textColor,
+                                            opacity: 0.7,
+                                        }}
+                                    >
+                                        {group.date}
                                     </div>
-                                ) : (
-                                    <></>
-                                )}
-                                <span
-                                    className="break-words hyphens-auto whitespace-pre-wrap"
-                                    style={{
-                                        color:
-                                            msg.sender === "System"
-                                                ? systemTextColor
-                                                : textColor,
-                                    }}
-                                >
-                                    {msg.text}
-                                </span>
+                                </div>
+
+                                {/* Nachrichten dieser Gruppe */}
+                                {group.messages.map((msg, i) => (
+                                    <div
+                                        key={i}
+                                        className={`mb-2 flex ${msg.sender === username || msg.sender === "System" ? "justify-start" : "justify-end"}`}
+                                    >
+                                        <div
+                                            className="max-w-[70%] break-words hyphens-auto"
+                                            style={{ color: textColor }}
+                                        >
+                                            {msg.sender === username ? (
+                                                <>
+                                                    <span
+                                                        className="opacity-60 text-xs"
+                                                        style={{ color: textColor }}
+                                                    >
+                                                        [
+                                                        {msg.timestamp
+                                                            ? msg.timestamp.toLocaleTimeString()
+                                                            : ""}
+                                                        ]{" "}
+                                                    </span>
+                                                    <span
+                                                        className="font-bold"
+                                                        style={{ color: textColor }}
+                                                    >
+                                                        {msg.sender}
+                                                        <br />
+                                                    </span>
+                                                </>
+                                            ) : msg.sender !== "System" ? (
+                                                <div className="flex justify-end gap-1">
+                                                    <span
+                                                        className="font-bold"
+                                                        style={{ color: textColor }}
+                                                    >
+                                                        {msg.sender}{" "}
+                                                    </span>
+                                                    <span
+                                                        className="opacity-60 text-xs"
+                                                        style={{ color: textColor }}
+                                                    >
+                                                        [
+                                                        {msg.timestamp
+                                                            ? msg.timestamp.toLocaleTimeString()
+                                                            : ""}
+                                                        ]
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <></>
+                                            )}
+                                            <span
+                                                className="break-words hyphens-auto whitespace-pre-wrap"
+                                                style={{
+                                                    color:
+                                                        msg.sender === "System"
+                                                            ? systemTextColor
+                                                            : textColor,
+                                                }}
+                                            >
+                                                {msg.text}
+                                            </span>
+
+                                            {/* Lesebestätigung - nur für eigene Nachrichten (OUT oder wenn sender === username) */}
+                                            {msg.sender === username && msg.kind !== "COMMAND" && msg.kind !== "ERROR" && msg.kind !== "INFO" && msg.kind !== "TEMPINFO" && msg.readBy !== undefined && (
+                                                <div className="flex items-center gap-1 mt-1 opacity-60">
+                                                    <span style={{ color: textColor, fontSize: "0.7rem" }}>
+                                                        ✓
+                                                    </span>
+                                                    <span style={{ color: textColor, fontSize: "0.65rem" }}>
+                                                        {msg.readBy}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        </div>
-                    ))}
+                        ));
+                    })()}
                 </div>
 
                 {/* Error-Popover über Eingabe */}
