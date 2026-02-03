@@ -398,13 +398,14 @@ const COMMANDS: Record<string, CmdHandler> = {
             "Verfügbare Befehle:\n\n" +
                 "=== Nachrichten ===\n" +
                 "  send <Nachricht>     - Sendet eine Nachricht\n" +
-                "  clear                - Löscht alle Nachrichten aus dem Terminal\n" +
+                "  clear                - Löscht alle Info-Nachrichten aus dem Terminal\n" +
+                "  clearall             - Löscht alle Nachrichten aus dem Terminal\n" +
                 "  history              - Zeigt Nachrichtenverlauf des aktuellen Raums\n\n" +
                 "=== Benutzer ===\n" +
                 "  whoami               - Zeigt aktuellen Benutzer\n" +
                 "  forge <Name>         - Erstellt neuen Benutzer\n" +
                 "  impersonate <Name>   - Wechselt zu anderem Benutzer\n" +
-                "  enter                - Wechselt Chat\n" +
+                "  accede               - Wechselt Chat\n" +
                 "  roomtour             - Liste alle Benutzer/Gruppen\n\n" +
                 "=== Personalisierung ===\n" +
                 "  theme [Optionen]     - Passe Farben und Schrift an\n" +
