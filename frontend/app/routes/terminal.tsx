@@ -123,7 +123,6 @@ const COMMANDS: Record<string, CmdHandler> = {
             "INFO",
             "System",
         );
-        //ctx.showSystemNotification("Aktueller Benutzer: <" + ctx.user + ">");
     },
     clear: (_args, ctx) => {
         // handled specially by caller (could also return a flag)
@@ -957,11 +956,6 @@ export default function Terminal() {
         return () => clearTimeout(timer);
     }, [popoverText]);
 
-    // Debug: messages nach Update loggen
-    useEffect(() => {
-        console.log(`messages updated: [${messages.length}]`, JSON.stringify(messages, null, 2));
-    }, [messages]);
-
     function pushMessage(text: string, kind: string, sender: string, timestamp?: Date, id?: number) {
         if (kind === "CLEAR") {
             //falls kind: clear alle nachichten löschen (nur lokal)
@@ -972,8 +966,6 @@ export default function Terminal() {
         //Neue Nachricht anhängen, aber vorher aufräumen
         setMessages((m) => {
             let updated = [...m];
-
-            console.log(`pushing message: [${kind}] ${text}`);
 
             // Wenn kind der aktuellen Nachricht INFO oder IN ist, lösche alle COMMAND, ERROR und TEMPINFO
             if (kind === "INFO" || kind === "IN") {
@@ -990,9 +982,8 @@ export default function Terminal() {
                 {
                     id: id ?? idRef.current++,
                     text,
-                    kind,
-                    sender:
-                        kind !== "IN" && kind !== "OUT" ? "System" : user,
+                    kind,                                                           //whack shit: manchmal ist user hier guest, obwohl whoami den richtigen namen zurückgibt
+                    sender: sender ?? (kind !== "IN" && kind !== "OUT" ? "System" : user),
                     timestamp: new Date(),
                     readBy: kind === "OUT" ? 0 : undefined, // Nur für gesendete Nachrichten
                 },
