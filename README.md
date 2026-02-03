@@ -12,5 +12,5 @@ Es gibt eine Beispieldatei `.env.example`, die in `.env` kopiert und mit den eig
 Danach kann der Server mit folgendem Befehl gestartet werden:
 
 ```bash
-python -m backend.server
+python backend.server
 ```

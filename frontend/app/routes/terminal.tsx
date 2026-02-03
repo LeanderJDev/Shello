@@ -87,11 +87,16 @@ type CmdHandler = (
         user: string;
         setUser: (s: string) => void;
         pushMessage: (s: string, kind: string, sender: string) => void;
+        sendMessage: (text: string) => void;
         createUser: (username: string) => void;
+        createRoom: (roomName: string) => void;
         changeUser: (username: string) => void;
         enterRoom: (roomName: string) => void;
         getHistory: () => void;
         getRooms: () => void;
+        roomExists: (roomName: string) => boolean;
+        getRoomByName: (roomName: string) => { id: number; name: string } | undefined;
+        getAllRoomNames: () => string[];
         showSystemNotification: (text: string) => void;
         themeColors?: ThemeColors;
         setThemeColors?: (colors: ThemeColors) => void;
@@ -128,8 +133,8 @@ const COMMANDS: Record<string, CmdHandler> = {
     },
     send: (args, ctx) => {
         if (args.length === 0) throw new Error("send: Nachricht fehlt");
-        ctx.pushMessage(args.join(" "), "OUT", ctx.user);
-        ctx.pushMessage("Sende Nachricht...", "TEMPINFO", ctx.user);
+        const message = args.join(" ");
+        ctx.sendMessage(message);
     },
     // Erstellt einen neuen Benutzer (oder wechselt zu einem Namen)
     forge: (args, ctx) => {
@@ -153,7 +158,23 @@ const COMMANDS: Record<string, CmdHandler> = {
             "System",
         );
     },
-    enter: (args, ctx) => {
+
+    // Neuen Raum erstellen
+    "create room": (args, ctx) => {
+        if (!args[0]) throw new Error("create room: Raumname fehlt");
+
+        const roomName = args.join(" "); // Unterstütze Leerzeichen im Namen
+
+        // Prüfe ob Raum bereits existiert
+        if (ctx.roomExists(roomName)) {
+            throw new Error(`Raum '${roomName}' existiert bereits`);
+        }
+
+        // Sende create_room an Server (Erfolgsmeldung kommt vom Server)
+        ctx.createRoom(roomName);
+    },
+
+    accede: (args, ctx) => {
         if (!args[0]) throw new Error("enter: Raumname fehlt");
         ctx.pushMessage(
             `Wechsel zu Raum '${args[0]}'...`,
@@ -363,8 +384,8 @@ const COMMANDS: Record<string, CmdHandler> = {
                 "=== Nachrichten ===\n" +
                 "  send <Nachricht>     - Sendet eine Nachricht\n" +
                 "  clear                - Löscht alle Nachrichten aus dem Terminal\n" +
-                "  history              - Zeigt Nachrichtenhistorie\n\n" +
-                "=== Benutzer & Chat ===\n" +
+                "  history              - Zeigt Nachrichtenverlauf des aktuellen Raums\n\n" +
+                "=== Benutzer ===\n" +
                 "  whoami               - Zeigt aktuellen Benutzer\n" +
                 "  forge <Name>         - Erstellt neuen Benutzer\n" +
                 "  impersonate <Name>   - Wechselt zu anderem Benutzer\n" +
@@ -382,6 +403,7 @@ const COMMANDS: Record<string, CmdHandler> = {
                 "  theme load [Name]    - Lade gespeichertes Theme (ohne Name: Liste)\n\n" +
                 "=== System ===\n" +
                 "  help                 - Diese Hilfe\n" +
+                "  h                    - Kurze Befehlsliste\n" +
                 "  exit                 - Beende Terminal-Sitzung (noch nicht implementiert)",
         );
     },
@@ -489,7 +511,7 @@ export default function Terminal() {
 
     // Abgeleitete Variablen für Kompatibilität
     const username = user;
-    const roomLabel = "Shello";
+    const roomLabel = roomName !== "null" ? `${roomName}` : "No Room Selected";
     const inputValue = input;
     const setInputValue = setInput;
     const bgColor = themeColors.bgColor;
@@ -522,7 +544,7 @@ export default function Terminal() {
     function tryPushMessage(text: string, kind: string, sender: string) {
         if (nextRequestSilent.current) {
             nextRequestSilent.current = false;
-            console.log(`uppressed msg:\n${text}`);
+            console.log(`suppressed msg:\n${text}`);
             return;
         }
         pushMessage(text, kind, sender);
@@ -543,6 +565,56 @@ export default function Terminal() {
         ws.current.onmessage = (event) => {
             const data = JSON.parse(event.data); //event.data ist der Text vom Server
             console.log("Nachricht vom Server:", data);
+
+            // Broadcast-Events vom Server (haben "event" statt "response")
+            if (data.event) {
+                switch (data.event) {
+                    case "new_message":
+                        // Neue Nachricht wurde gebroadcastet
+                        const msg = data.payload?.message;
+                        if (msg) {
+                            setMessages((prev) => [
+                                ...prev,
+                                {
+                                    id: msg.MessageID,
+                                    text: msg.Text ?? "",
+                                    kind: "IN",
+                                    sender: msg.Name ?? "unknown",
+                                    timestamp: msg.Time
+                                        ? new Date(msg.Time.replace(" ", "T"))
+                                        : new Date(),
+                                },
+                            ]);
+                        }
+                        break;
+                    case "room_created":
+                        // Neuer Raum wurde erstellt
+                        getRooms();
+                        pushMessage(
+                            `Raum '${data.payload.room_name}' erfolgreich erstellt.`,
+                            "INFO",
+                            "System",
+                        );
+                        break;
+                    case "room_updated":
+                        // Raum wurde aktualisiert
+                        getRooms();
+                        break;
+                    case "user_joined":
+                        // Benutzer ist beigetreten
+                        const joinedUser = data.payload;
+                        if (joinedUser?.user_id && joinedUser?.username) {
+                            addUserToKnownList(joinedUser.user_id, joinedUser.username);
+                        }
+                        break;
+                    case "user_left":
+                        // Benutzer hat verlassen
+                        break;
+                }
+                return; // Broadcast-Event behandelt
+            }
+
+            // Response-Events vom Server (haben "response" statt "event")
             switch (data.response) {
                 case "get_rooms":
                     // Ergebnis kann z.B. [{ ID: 1, Name: "Raum" }, ...] sein
@@ -580,9 +652,9 @@ export default function Terminal() {
                             "ERROR",
                             "System",
                         );
-                    else if (data.result === null || data.result.length == 0) {
-                        break;
-                    }
+                    // Nachricht wurde erfolgreich gesendet
+                    // Die neue Nachricht kommt über broadcast "new_message"
+                    break;
                 case "get_messages":
                     console.log(data.result);
                     setMessages(
@@ -598,6 +670,16 @@ export default function Terminal() {
                               }))
                             : [],
                     );
+                    break;
+                case "join_room":
+                    if (data.error !== null) {
+                        tryPushMessage(
+                            `Fehler beim Beitreten: ${data.error}`,
+                            "ERROR",
+                            "System",
+                        );
+                    }
+                    // Erfolgreicher Beitritt - broadcast kommt vom Server
                     break;
                 case "login_as":
                     if (data.error === null) {
@@ -636,6 +718,23 @@ export default function Terminal() {
                             "ERROR",
                             "System",
                         );
+                    break;
+                case "create_room":
+                    if (data.error === null) {
+                        pushMessage(
+                            `Raum '${data.result.room_name}' erfolgreich erstellt.`,
+                            "INFO",
+                            "System",
+                        );
+                        // Aktualisiere Raumliste sofort
+                        getRooms();
+                    } else if (data.error) {
+                        pushMessage(
+                            `Fehler beim Erstellen des Raums: ${data.error}`,
+                            "ERROR",
+                            "System",
+                        );
+                    }
                     break;
                 case "nameof_user":
                     if (data.error === null && data.result !== null) {
@@ -700,6 +799,13 @@ export default function Terminal() {
         );
     }
 
+    function createRoom(roomName: string) {
+        // Nachricht an Server senden
+        ws.current?.send(
+            JSON.stringify({ func: "create_room", room_name: roomName }),
+        );
+    }
+
     function changeUser(username: string) {
         // Nachricht an Server senden
         ws.current?.send(
@@ -731,6 +837,37 @@ export default function Terminal() {
         }
         setRoom([match.id, match.name]);
         pushMessage(`Zu Raum '${roomName}' gewechselt.`, "INFO", "System");
+
+        // Trete dem Raum auf dem Server bei
+        ws.current?.send(
+            JSON.stringify({ func: "join_room", room_id: match.id })
+        );
+
+        // Hole Nachrichten für diesen Raum
+        ws.current?.send(
+            JSON.stringify({ func: "get_messages", room_id: match.id })
+        );
+    }
+
+    /**
+     * Prüft ob ein Raum mit dem gegebenen Namen existiert
+     */
+    function roomExists(roomName: string): boolean {
+        return rooms.some((r) => r.name === roomName);
+    }
+
+    /**
+     * Sucht einen Raum nach Namen und gibt ihn zurück (oder undefined)
+     */
+    function getRoomByName(roomName: string): { id: number; name: string } | undefined {
+        return rooms.find((r) => r.name === roomName);
+    }
+
+    /**
+     * Gibt alle Raumnamen als Array zurück
+     */
+    function getAllRoomNames(): string[] {
+        return rooms.map((r) => r.name);
     }
 
     function addUserToKnownList(id: number, name: string) {
@@ -756,17 +893,13 @@ export default function Terminal() {
             setMessages([]);
             return;
         }
-        if (kind === "OUT") {
-            //falls kind: out, nachicht an server senden
-            sendMessage(text);
-        }
 
         //Neue Nachricht anhängen, aber vorher aufräumen
         setMessages((m) => {
             let updated = [...m];
 
-            // Wenn kind der aktuellen Nachricht INFO oder OUT ist, lösche alle COMMAND, ERROR und TEMPINFO
-            if (kind === "INFO" || kind === "OUT" || kind === "IN") {
+            // Wenn kind der aktuellen Nachricht INFO oder IN ist, lösche alle COMMAND, ERROR und TEMPINFO
+            if (kind === "INFO" || kind === "IN") {
                 updated = updated.filter(
                     (msg) =>
                         msg.kind !== "COMMAND" &&
@@ -775,19 +908,17 @@ export default function Terminal() {
                 );
             }
 
-            if (kind !== "OUT")
-                return [
-                    ...updated,
-                    {
-                        id: idRef.current++,
-                        text,
-                        kind,
-                        sender:
-                            kind !== "IN" && kind !== "OUT" ? "System" : user,
-                        timestamp: new Date(),
-                    },
-                ];
-            else return updated;
+            return [
+                ...updated,
+                {
+                    id: idRef.current++,
+                    text,
+                    kind,
+                    sender:
+                        kind !== "IN" && kind !== "OUT" ? "System" : user,
+                    timestamp: new Date(),
+                },
+            ];
         });
     }
 
@@ -813,26 +944,55 @@ export default function Terminal() {
     async function handleCommandLine(line: string) {
         // Leere Zeilen ignorieren
         if (!line.trim()) return;
+
+        // Befehl zur Historie hinzufügen (wenn nicht identisch mit letztem)
+        const lastCommand = commandHistory[commandHistory.length - 1];
+        if (line !== lastCommand) {
+            setCommandHistory((prev) => [...prev, line]);
+        }
+
+        setHistoryIndex(-1);
+
         pushMessage(`> ${line}`, "COMMAND", "System");
 
         try {
             // Kommando parsen
             const { cmd, args } = parseCommand(line);
 
-            // Handler suchen
-            const handler = COMMANDS[cmd];
+            let handler: CmdHandler | undefined;
+            let finalArgs = args;
+
+            // Zuerst prüfen ob es einen Subcommand gibt (z.B. "theme save")
+            if (args.length > 0) {
+                const subCmd = `${cmd} ${args[0]}`;
+                if (COMMANDS[subCmd]) {
+                    handler = COMMANDS[subCmd];
+                    finalArgs = args.slice(1); // Subcommand aus args entfernen
+                }
+            }
+
+            // Fallback: normaler Befehl
+            if (!handler) {
+                handler = COMMANDS[cmd];
+            }
+
             if (!handler) throw new Error("Unbekannter Befehl: " + cmd);
 
             // Handler ausführen mit Kontext
-            await handler(args, {
+            await handler(finalArgs, {
                 user,
                 setUser,
                 pushMessage,
+                sendMessage,
                 createUser,
+                createRoom,
                 changeUser,
                 enterRoom,
                 getRooms,
                 getHistory,
+                roomExists,
+                getRoomByName,
+                getAllRoomNames,
                 showSystemNotification,
                 themeColors,
                 setThemeColors,
@@ -987,7 +1147,30 @@ export default function Terminal() {
                 </div>
 
                 {/* Nachrichten-Bereich: Terminal Style */}
-                <div className="flex-1 overflow-y-auto p-6 font-mono text-sm">
+                <div
+                    className="flex-1 overflow-y-auto p-6 font-mono text-sm"
+                    style={{
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: `${themeColors.textColor} ${themeColors.bgColor}`,
+                    }}
+                >
+                    <style>{`
+                        .flex-1.overflow-y-auto::-webkit-scrollbar {
+                            width: 12px;
+                        }
+                        .flex-1.overflow-y-auto::-webkit-scrollbar-track {
+                            background: ${themeColors.bgColor};
+                            border-left: 1px solid ${themeColors.borderColor};
+                        }
+                        .flex-1.overflow-y-auto::-webkit-scrollbar-thumb {
+                            background: ${themeColors.textColor};
+                            border-radius: 6px;
+                            border: 2px solid ${themeColors.bgColor};
+                        }
+                        .flex-1.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+                            background: ${themeColors.buttonHoverBgColor};
+                        }
+                    `}</style>
                     {messages.map((msg, i) => (
                         <div
                             key={i}
