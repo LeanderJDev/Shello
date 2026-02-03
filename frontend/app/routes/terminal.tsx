@@ -128,6 +128,10 @@ const COMMANDS: Record<string, CmdHandler> = {
         // handled specially by caller (could also return a flag)
         ctx.pushMessage("", "CLEAR", "System"); // Marker
     },
+    clearall: (_args, ctx) => {
+        // handled specially by caller (could also return a flag)
+        ctx.pushMessage("", "CLEARALL", "System"); // Marker
+    },
     history: (_args, ctx) => {
         ctx.getHistory();
     },
@@ -496,6 +500,9 @@ export default function Terminal() {
     // Referenz zum Messages-Container (für Auto-Scroll)
     const messagesRef = useRef<HTMLDivElement | null>(null);
 
+    // Ref für aktuellen messages state (um in WebSocket Handler Zugriff zu haben)
+    const messagesStateRef = useRef(messages);
+
     // cycle through available emotions
     const emotionKeys = Object.values(EmotionKey) as EmotionKey[];
     const [emotionIndex, setEmotionIndex] = useState(0);
@@ -538,6 +545,8 @@ export default function Terminal() {
 
     // Automatisch nach unten scrollen wenn neue Nachrichten hinzukommen
     useEffect(() => {
+        messagesStateRef.current = messages;
+        
         const el = messagesRef.current;
 
         if (!el) return;
@@ -625,6 +634,11 @@ export default function Terminal() {
                         break;
                     case "user_left":
                         // Benutzer hat verlassen
+                        break;
+                    case "message_deleted":
+                        const mesg = messagesStateRef.current.find(msg => msg.id === data.payload.message_id);
+                        console.log("message_deleted event received for id:", data.payload.message_id, "found message:", mesg);
+                        setMessages(prev => prev.filter(m => m.id !== data.payload.message_id));
                         break;
                 }
                 return; // Broadcast-Event behandelt
@@ -772,15 +786,7 @@ export default function Terminal() {
                             "ERROR",
                             "System",
                         );
-                    const msg = messages.find(msg => msg.id === data.result.message_id);
-                    if (msg) {
-                        tryPushMessage(
-                            `Nachricht '${msg.text}' erfolgreich gelöscht.`,
-                            "INFO",
-                            "System",
-                        );
-                        setMessages(prev => prev.filter(m => m.id !== data.result.message_id));
-                    } else {
+                    else {
                         tryPushMessage(
                             `Nachricht erfolgreich gelöscht.`,
                             "INFO",
@@ -857,7 +863,7 @@ export default function Terminal() {
 
         // Nachricht an Server senden
         ws.current?.send(
-            JSON.stringify({ func: "delete_msg", message_id: msgID }),
+            JSON.stringify({ func: "delete_msg", message_id: msgID, room_id: roomID }),
         );
     }
 
@@ -957,9 +963,19 @@ export default function Terminal() {
     }, [popoverText]);
 
     function pushMessage(text: string, kind: string, sender: string, timestamp?: Date, id?: number) {
-        if (kind === "CLEAR") {
+        if (kind === "CLEAR_ALL") {
             //falls kind: clear alle nachichten löschen (nur lokal)
             setMessages([]);
+            return;
+        }
+
+        if (kind === "CLEAR") {
+            //falls kind: clear alle nachichten löschen, die nicht IN sind (nur lokal)
+            setMessages((m) => {
+                let updated = [...m];
+                updated = updated.filter((msg) => msg.kind === "IN" );
+                return [...updated];
+            });
             return;
         }
 

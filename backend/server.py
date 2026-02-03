@@ -407,6 +407,7 @@ async def handle_client(websocket, dbClient: DatabaseClient):
 
             elif func == "delete_msg":
                 message_id = data.get("message_id") or data.get("MessageID")
+                room_id = data.get("room_id")
                 if not message_id:
                     error = "message_id required"
                 else:
@@ -414,14 +415,15 @@ async def handle_client(websocket, dbClient: DatabaseClient):
                         res = dbClient.delete_message(message_id)
                         result = res
                         # broadcast message_deleted to room: best-effort
-                        try:
-                            await broadcast_event(
-                                None,
-                                "message_deleted",
-                                {"message_id": message_id},
-                            )
-                        except Exception:
-                            pass
+                        if room_id:
+                            try:
+                                await broadcast_event(
+                                    room_id,
+                                    "message_deleted",
+                                    {"message_id": message_id},
+                                )
+                            except Exception:
+                                pass
                     except Exception as e:
                         error = f"db error: {e}"
 
