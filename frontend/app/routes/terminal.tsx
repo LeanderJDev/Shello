@@ -229,6 +229,7 @@ const COMMANDS: Record<string, CmdHandler> = {
     //   -bc <Farbe>  - Randfarbe (border color)
     //   -ob <Farbe>  - Äußere Hintergrundfarbe (outer background)
     //   -hv <Farbe>  - Button Hover Farbe
+    //   -sc <Farbe>  - System-Nachrichten Farbe (system color)
     //   -f <Schriftart> - Schriftart (font)
     theme: (args, ctx) => {
         if (!ctx.setThemeColors || !ctx.themeColors) {
@@ -242,6 +243,7 @@ const COMMANDS: Record<string, CmdHandler> = {
         let borderColor: string | null = null;
         let outerBgColor: string | null = null;
         let hoverColor: string | null = null;
+        let systemColor: string | null = null;
         let font: string | null = null;
 
         for (let i = 0; i < args.length; i++) {
@@ -260,6 +262,9 @@ const COMMANDS: Record<string, CmdHandler> = {
             } else if (args[i] === "-hv" && i + 1 < args.length) {
                 hoverColor = args[i + 1];
                 i++;
+            } else if (args[i] === "-sc" && i + 1 < args.length) {
+                systemColor = args[i + 1];
+                i++;
             } else if (args[i] === "-f" && i + 1 < args.length) {
                 font = args[i + 1];
                 i++;
@@ -272,6 +277,7 @@ const COMMANDS: Record<string, CmdHandler> = {
             !borderColor &&
             !outerBgColor &&
             !hoverColor &&
+            !systemColor &&
             !font
         ) {
             ctx.showSystemNotification(
@@ -282,6 +288,7 @@ const COMMANDS: Record<string, CmdHandler> = {
                     "  -bc <Farbe>  Randfarbe\n" +
                     "  -ob <Farbe>  Äußere Hintergrundfarbe\n" +
                     "  -hv <Farbe>  Button Hover Farbe\n" +
+                    "  -sc <Farbe>  System-Nachrichten Farbe\n" +
                     "  -f <Schrift> Schriftart (noch nicht implementiert)\n\n" +
                     "Beispiel: theme -tc #00ff00 -bg #000000",
             );
@@ -315,6 +322,11 @@ const COMMANDS: Record<string, CmdHandler> = {
         if (hoverColor) {
             newTheme.buttonHoverBgColor = hoverColor;
             changes.push(`Hover-Farbe: ${hoverColor}`);
+        }
+
+        if (systemColor) {
+            newTheme.systemTextColor = systemColor;
+            changes.push(`System-Nachrichten Farbe: ${systemColor}`);
         }
 
         if (font) {
@@ -422,7 +434,7 @@ const COMMANDS: Record<string, CmdHandler> = {
                 "  whoami               - Zeigt aktuellen Benutzer\n" +
                 "  forge <Name>         - Erstellt neuen Benutzer\n" +
                 "  impersonate <Name>   - Wechselt zu anderem Benutzer\n" +
-                "  enter                - Wechselt Chat\n" +
+                "  accede                - Wechselt Chat\n" +
                 "  roomtour             - Liste alle Benutzer/Gruppen\n\n" +
                 "=== Personalisierung ===\n" +
                 "  theme [Optionen]     - Passe Farben und Schrift an\n" +
@@ -431,6 +443,7 @@ const COMMANDS: Record<string, CmdHandler> = {
                 "    -bc <Farbe>        - Randfarbe\n" +
                 "    -ob <Farbe>        - Äußere Hintergrundfarbe\n" +
                 "    -hv <Farbe>        - Button Hover Farbe\n" +
+                "    -sc <Farbe>        - System-Nachrichten Farbe\n" +
                 "    -f <Schrift>       - Schriftart (noch nicht implementiert)\n" +
                 "  theme save <Name>    - Speichere aktuelles Theme\n" +
                 "  theme load [Name]    - Lade gespeichertes Theme (ohne Name: Liste)\n\n" +
@@ -457,6 +470,7 @@ interface ThemeColors {
     textColor: string;
     borderColor: string;
     buttonHoverBgColor: string;
+    systemTextColor: string;
 }
 
 // Standard-Theme (Dunkles Terminal-Design)
@@ -466,6 +480,7 @@ const defaultTheme: ThemeColors = {
     textColor: "#00ff00",
     borderColor: "#333333",
     buttonHoverBgColor: "#00cc00",
+    systemTextColor: "#ffcc00",
 };
 
 /**
@@ -565,7 +580,7 @@ export default function Terminal() {
     const setInputValue = setInput;
     const bgColor = themeColors.bgColor;
     const textColor = themeColors.textColor;
-    const systemTextColor = "#ffcc00";
+    const systemTextColor = themeColors.systemTextColor;
     const buttonHoverBgColor = themeColors.buttonHoverBgColor;
 
     // Beim ersten Laden: Input-Feld fokussieren
@@ -674,6 +689,7 @@ export default function Terminal() {
                         break;
                     case "room_created":
                         // Neuer Raum wurde erstellt
+                        nextRequestSilent.current = true;
                         getRooms();
                         pushMessage(
                             `Raum '${data.payload.room_name}' erfolgreich erstellt.`,
@@ -683,6 +699,7 @@ export default function Terminal() {
                         break;
                     case "room_updated":
                         // Raum wurde aktualisiert
+                        nextRequestSilent.current = true;
                         getRooms();
                         break;
                     case "user_joined":
@@ -820,12 +837,26 @@ export default function Terminal() {
                     break;
                 case "create_room":
                     if (data.error === null) {
+                        const newRoomId = data.result.room_id;
+                        const newRoomName = data.result.room_name;
+
                         pushMessage(
-                            `Raum '${data.result.room_name}' erfolgreich erstellt.`,
-                            "INFO",
+                            `Raum '${newRoomName}' erfolgreich erstellt.`,
+                            "TEMPINFO",
                             "System",
                         );
-                        // Aktualisiere Raumliste sofort
+
+                        // Direkt in den neu erstellten Raum wechseln
+                        setRoom([newRoomId, newRoomName]);
+                        pushMessage(`Zu Raum '${newRoomName}' gewechselt.`, "TEMPINFO", "System");
+
+                        // Trete dem Raum auf dem Server bei
+                        ws.current?.send(
+                            JSON.stringify({ func: "join_room", room_id: newRoomId })
+                        );
+
+                        // Aktualisiere Raumliste im Hintergrund (ohne Anzeige)
+                        nextRequestSilent.current = true;
                         getRooms();
                     } else if (data.error) {
                         pushMessage(
@@ -1328,7 +1359,7 @@ export default function Terminal() {
                                     >
                                         <div
                                             className="max-w-[70%] break-words hyphens-auto"
-                                            style={{ color: textColor }}
+                                            style={{ color: msg.sender === "System" ? systemTextColor : textColor }}
                                         >
                                             {msg.sender === username ? (
                                                 <>
