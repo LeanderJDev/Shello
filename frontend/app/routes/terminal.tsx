@@ -13,6 +13,36 @@ export function meta({}: Route.MetaArgs) {
 }
 
 /**
+ * Speichert Session-Daten (User, Raum) in localStorage
+ */
+function saveSessionToStorage(user: string, roomID: number, roomName: string) {
+    try {
+        const sessionData = {
+            user,
+            roomID,
+            roomName,
+        };
+        localStorage.setItem("shelloSession", JSON.stringify(sessionData));
+    } catch (err) {
+        console.error("Fehler beim Speichern der Session:", err);
+    }
+}
+
+/**
+ * Lädt Session-Daten (User, Raum) aus localStorage
+ */
+function loadSessionFromStorage(): { user: string; roomID: number; roomName: string } | null {
+    try {
+        const stored = localStorage.getItem("shelloSession");
+        if (!stored) return null;
+        return JSON.parse(stored);
+    } catch (err) {
+        console.error("Fehler beim Laden der Session:", err);
+        return null;
+    }
+}
+
+/**
  * Parst eine Kommandozeilen-Eingabe in Befehl und Argumente
  * Unterstützt Quoting mit einfachen und doppelten Anführungszeichen
  * z.B. "send 'hallo welt'" -> cmd: "send", args: ["hallo welt"]
@@ -211,6 +241,7 @@ const COMMANDS: Record<string, CmdHandler> = {
     //   -bc <Farbe>  - Randfarbe (border color)
     //   -ob <Farbe>  - Äußere Hintergrundfarbe (outer background)
     //   -hv <Farbe>  - Button Hover Farbe
+    //   -sc <Farbe>  - System-Nachrichten Farbe (system color)
     //   -f <Schriftart> - Schriftart (font)
     theme: (args, ctx) => {
         if (!ctx.setThemeColors || !ctx.themeColors) {
@@ -224,6 +255,7 @@ const COMMANDS: Record<string, CmdHandler> = {
         let borderColor: string | null = null;
         let outerBgColor: string | null = null;
         let hoverColor: string | null = null;
+        let systemColor: string | null = null;
         let font: string | null = null;
 
         for (let i = 0; i < args.length; i++) {
@@ -242,6 +274,9 @@ const COMMANDS: Record<string, CmdHandler> = {
             } else if (args[i] === "-hv" && i + 1 < args.length) {
                 hoverColor = args[i + 1];
                 i++;
+            } else if (args[i] === "-sc" && i + 1 < args.length) {
+                systemColor = args[i + 1];
+                i++;
             } else if (args[i] === "-f" && i + 1 < args.length) {
                 font = args[i + 1];
                 i++;
@@ -254,6 +289,7 @@ const COMMANDS: Record<string, CmdHandler> = {
             !borderColor &&
             !outerBgColor &&
             !hoverColor &&
+            !systemColor &&
             !font
         ) {
             ctx.showSystemNotification(
@@ -264,6 +300,7 @@ const COMMANDS: Record<string, CmdHandler> = {
                     "  -bc <Farbe>  Randfarbe\n" +
                     "  -ob <Farbe>  Äußere Hintergrundfarbe\n" +
                     "  -hv <Farbe>  Button Hover Farbe\n" +
+                    "  -sc <Farbe>  System-Nachrichten Farbe\n" +
                     "  -f <Schrift> Schriftart (noch nicht implementiert)\n\n" +
                     "Beispiel: theme -tc #00ff00 -bg #000000",
             );
@@ -297,6 +334,11 @@ const COMMANDS: Record<string, CmdHandler> = {
         if (hoverColor) {
             newTheme.buttonHoverBgColor = hoverColor;
             changes.push(`Hover-Farbe: ${hoverColor}`);
+        }
+
+        if (systemColor) {
+            newTheme.systemTextColor = systemColor;
+            changes.push(`System-Nachrichten Farbe: ${systemColor}`);
         }
 
         if (font) {
@@ -405,7 +447,7 @@ const COMMANDS: Record<string, CmdHandler> = {
                 "  whoami               - Zeigt aktuellen Benutzer\n" +
                 "  forge <Name>         - Erstellt neuen Benutzer\n" +
                 "  impersonate <Name>   - Wechselt zu anderem Benutzer\n" +
-                "  accede               - Wechselt Chat\n" +
+                "  accede                - Wechselt Chat\n" +
                 "  roomtour             - Liste alle Benutzer/Gruppen\n\n" +
                 "=== Personalisierung ===\n" +
                 "  theme [Optionen]     - Passe Farben und Schrift an\n" +
@@ -414,6 +456,7 @@ const COMMANDS: Record<string, CmdHandler> = {
                 "    -bc <Farbe>        - Randfarbe\n" +
                 "    -ob <Farbe>        - Äußere Hintergrundfarbe\n" +
                 "    -hv <Farbe>        - Button Hover Farbe\n" +
+                "    -sc <Farbe>        - System-Nachrichten Farbe\n" +
                 "    -f <Schrift>       - Schriftart (noch nicht implementiert)\n" +
                 "  theme save <Name>    - Speichere aktuelles Theme\n" +
                 "  theme load [Name]    - Lade gespeichertes Theme (ohne Name: Liste)\n\n" +
@@ -440,6 +483,7 @@ interface ThemeColors {
     textColor: string;
     borderColor: string;
     buttonHoverBgColor: string;
+    systemTextColor: string;
 }
 
 // Standard-Theme (Dunkles Terminal-Design)
@@ -449,6 +493,7 @@ const defaultTheme: ThemeColors = {
     textColor: "#00ff00",
     borderColor: "#333333",
     buttonHoverBgColor: "#00cc00",
+    systemTextColor: "#ffcc00",
 };
 
 /**
@@ -474,7 +519,11 @@ export default function Terminal() {
     >([]);
 
     // Aktueller Benutzername (wird im Prompt angezeigt)
-    const [user, setUser] = useState("guest");
+    // Versuche gespeicherte Session aus localStorage zu laden
+    const [user, setUser] = useState(() => {
+        const saved = loadSessionFromStorage();
+        return saved?.user || "guest";
+    });
 
     // Text für Fehler-Popover (leer = Popover ist versteckt)
     const [popoverText, setPopoverText] = useState("");
@@ -490,14 +539,17 @@ export default function Terminal() {
     // Letzte System-Benachrichtigung (für Toggle-Funktion)
     const [lastSystemNotification, setLastSystemNotification] = useState("");
 
+    // Auto-Scroll aktiviert (wird deaktiviert wenn User hochscrollt)
+    const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+
     // Counter für eindeutige Message-IDs
     const idRef = useRef(1);
 
     // Referenz zum Input-Element (für Focus-Management)
     const inputRef = useRef<HTMLInputElement | null>(null);
 
-    // Referenz zum Messages-Container (für Auto-Scroll)
-    const messagesRef = useRef<HTMLDivElement | null>(null);
+    // Referenz zum scrollbaren Nachrichten-Container (für Auto-Scroll)
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
     // Ref für aktuellen messages state (um in WebSocket Handler Zugriff zu haben)
     const messagesStateRef = useRef(messages);
@@ -514,11 +566,19 @@ export default function Terminal() {
         return () => clearInterval(id);
     }, [emotionKeys.length]);
 
-    const [[roomID, roomName], setRoom] = useState<[number, string]>([
-        -1,
-        "null",
-    ]);
+    const [[roomID, roomName], setRoom] = useState<[number, string]>(() => {
+        const saved = loadSessionFromStorage();
+        if (saved) {
+            return [saved.roomID, saved.roomName];
+        }
+        return [-1, "null"];
+    });
     const [rooms, setRooms] = useState<{ id: number; name: string }[]>([]);
+
+    // Session-Daten in localStorage speichern wenn sie sich ändern
+    useEffect(() => {
+        saveSessionToStorage(user, roomID, roomName);
+    }, [user, roomID, roomName]);
 
     // Liste aller verfügbaren Befehle (für Tab-Completion)
     const commands = Object.keys(COMMANDS);
@@ -534,7 +594,7 @@ export default function Terminal() {
     const setInputValue = setInput;
     const bgColor = themeColors.bgColor;
     const textColor = themeColors.textColor;
-    const systemTextColor = "#ffcc00";
+    const systemTextColor = themeColors.systemTextColor;
     const buttonHoverBgColor = themeColors.buttonHoverBgColor;
 
     // Beim ersten Laden: Input-Feld fokussieren
@@ -543,16 +603,30 @@ export default function Terminal() {
     }, []);
 
     // Automatisch nach unten scrollen wenn neue Nachrichten hinzukommen
+    // ABER nur wenn Auto-Scroll aktiviert ist (User nicht hochgescrollt hat)
     useEffect(() => {
-        messagesStateRef.current = messages;
-        
-        const el = messagesRef.current;
+        if (!autoScrollEnabled) return;
 
+        const el = scrollContainerRef.current;
         if (!el) return;
 
-        // Sofort ans Ende scrollen (für smooth scrollen: behavior: 'smooth')
-        el.parentElement?.scrollTo({ top: el.scrollHeight, behavior: "auto" });
-    }, [messages]);
+        // Scrolle zum Ende des Containers
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }, [messages, autoScrollEnabled]);
+
+    // Handler für Scroll-Events: Prüft ob User ganz unten ist
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.currentTarget;
+        const scrollTop = target.scrollTop;
+        const scrollHeight = target.scrollHeight;
+        const clientHeight = target.clientHeight;
+
+        // Toleranz von 5px - wenn User innerhalb von 5px vom Ende ist, gilt das als "unten"
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 5;
+
+        // Auto-Scroll aktivieren wenn User ganz unten ist, sonst deaktivieren
+        setAutoScrollEnabled(isAtBottom);
+    };
 
     const ws = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -583,6 +657,25 @@ export default function Terminal() {
             pushMessage("Connected to Shello Server.", "INFO", "System");
             nextRequestSilent.current = true;
             getRooms();
+
+            // Wenn ein gespeicherter User (nicht guest) vorhanden ist, setze ihn auf dem Server
+            if (user && user !== "guest") {
+                ws.current?.send(
+                    JSON.stringify({ func: "login_as", username: user })
+                );
+            }
+
+            // Wenn ein gültiger Raum aus localStorage geladen wurde, trete bei und lade Historie
+            if (roomID > 0) {
+                // Warte kurz, damit login_as vorher verarbeitet werden kann
+                setTimeout(() => {
+                    // Trete dem Raum auf dem Server bei (wichtig für Mitgliederzählung)
+                    ws.current?.send(
+                        JSON.stringify({ func: "join_room", room_id: roomID })
+                    );
+                    getHistory();
+                }, 100); // 100ms Verzögerung
+            }
         };
 
         //wenn der Server was schickt, wird das hier ausgeführt
@@ -613,15 +706,17 @@ export default function Terminal() {
                         break;
                     case "room_created":
                         // Neuer Raum wurde erstellt
+                        nextRequestSilent.current = true;
                         getRooms();
                         pushMessage(
                             `Raum '${data.payload.room_name}' erfolgreich erstellt.`,
-                            "INFO",
+                            "TEMPINFO",
                             "System",
                         );
                         break;
                     case "room_updated":
                         // Raum wurde aktualisiert
+                        nextRequestSilent.current = true;
                         getRooms();
                         break;
                     case "user_joined":
@@ -665,11 +760,12 @@ export default function Terminal() {
             // Response-Events vom Server (haben "response" statt "event")
             switch (data.response) {
                 case "get_rooms":
-                    // Ergebnis kann z.B. [{ ID: 1, Name: "Raum" }, ...] sein
+                    // Ergebnis kann z.B. [{ ID: 1, Name: "Raum", MemberCount: 5 }, ...] sein
                     const mappedRooms = Array.isArray(data.result)
                         ? data.result.map((r: any) => ({
                               id: r.ID ?? r.id,
                               name: r.Name ?? r.name ?? "",
+                              memberCount: r.MemberCount ?? r.memberCount ?? 0,
                           }))
                         : [];
 
@@ -684,11 +780,23 @@ export default function Terminal() {
                         return;
                     }
 
-                    const roomNames = mappedRooms.map(
-                        (r: { id: number; name: string }) => r.name,
+                    // Sortiere Räume nach Mitgliederzahl (meiste zuerst)
+                    const sortedRooms = [...mappedRooms].sort(
+                        (a, b) => b.memberCount - a.memberCount
                     );
+
+                    // Erstelle nummerierte Liste mit Mitgliederanzahl
+                    const roomList = sortedRooms
+                        .map((r, index) => {
+                            const members = r.memberCount > 0
+                                ? ` (${r.memberCount} ${r.memberCount === 1 ? 'Mitglied' : 'Mitglieder'})`
+                                : '';
+                            return `${index + 1}. ${r.name}${members}`;
+                        })
+                        .join('\n');
+
                     tryPushMessage(
-                        `Verfügbare Räume: \n${roomNames.join(", ")}`,
+                        `Verfügbare Räume:\n${roomList}`,
                         "TEMPINFO",
                         "System",
                     );
@@ -770,12 +878,26 @@ export default function Terminal() {
                     break;
                 case "create_room":
                     if (data.error === null) {
+                        const newRoomId = data.result.room_id;
+                        const newRoomName = data.result.room_name;
+
                         pushMessage(
-                            `Raum '${data.result.room_name}' erfolgreich erstellt.`,
-                            "INFO",
+                            `Raum '${newRoomName}' erfolgreich erstellt.`,
+                            "TEMPINFO",
                             "System",
                         );
-                        // Aktualisiere Raumliste sofort
+
+                        // Direkt in den neu erstellten Raum wechseln
+                        setRoom([newRoomId, newRoomName]);
+                        pushMessage(`Zu Raum '${newRoomName}' gewechselt.`, "TEMPINFO", "System");
+
+                        // Trete dem Raum auf dem Server bei
+                        ws.current?.send(
+                            JSON.stringify({ func: "join_room", room_id: newRoomId })
+                        );
+
+                        // Aktualisiere Raumliste im Hintergrund (ohne Anzeige)
+                        nextRequestSilent.current = true;
                         getRooms();
                     } else if (data.error) {
                         pushMessage(
@@ -1252,7 +1374,9 @@ export default function Terminal() {
 
                 {/* Nachrichten-Bereich: Terminal Style */}
                 <div
+                    ref={scrollContainerRef}
                     className="flex-1 overflow-y-auto p-6 font-mono text-sm"
+                    onScroll={handleScroll}
                     style={{
                         scrollbarWidth: 'thin',
                         scrollbarColor: `${themeColors.textColor} ${themeColors.bgColor}`,
@@ -1330,7 +1454,7 @@ export default function Terminal() {
                                     >
                                         <div
                                             className="max-w-[70%] break-words hyphens-auto"
-                                            style={{ color: textColor }}
+                                            style={{ color: msg.sender === "System" ? systemTextColor : textColor }}
                                         >
                                             {msg.sender === username ? (
                                                 <>
