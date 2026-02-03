@@ -477,9 +477,7 @@ export default function Terminal() {
     const [user, setUser] = useState("guest");
 
     // Text für Fehler-Popover (leer = Popover ist versteckt)
-    const [popoverText, setPopoverText] = useState(
-        "Benutzen Sie 'help' für Hilfe.",
-    );
+    const [popoverText, setPopoverText] = useState("");
 
     const [knownUsers, setUsers] = useState<{ id: number; name: string }[]>([]);
 
@@ -1105,7 +1103,7 @@ export default function Terminal() {
             });
         } catch (err: any) {
             // Fehler im Popover anzeigen
-            showPopover(err?.message ?? String(err));
+            //showPopover(err?.message ?? String(err));
             pushMessage(err?.message ?? String(err), "ERROR", "System");
         }
     }
