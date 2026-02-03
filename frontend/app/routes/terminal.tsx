@@ -479,14 +479,17 @@ export default function Terminal() {
     // Letzte System-Benachrichtigung (für Toggle-Funktion)
     const [lastSystemNotification, setLastSystemNotification] = useState("");
 
+    // Auto-Scroll aktiviert (wird deaktiviert wenn User hochscrollt)
+    const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+
     // Counter für eindeutige Message-IDs
     const idRef = useRef(1);
 
     // Referenz zum Input-Element (für Focus-Management)
     const inputRef = useRef<HTMLInputElement | null>(null);
 
-    // Referenz zum Messages-Container (für Auto-Scroll)
-    const messagesRef = useRef<HTMLDivElement | null>(null);
+    // Referenz zum scrollbaren Nachrichten-Container (für Auto-Scroll)
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
     // cycle through available emotions
     const emotionKeys = Object.values(EmotionKey) as EmotionKey[];
@@ -529,14 +532,30 @@ export default function Terminal() {
     }, []);
 
     // Automatisch nach unten scrollen wenn neue Nachrichten hinzukommen
+    // ABER nur wenn Auto-Scroll aktiviert ist (User nicht hochgescrollt hat)
     useEffect(() => {
-        const el = messagesRef.current;
+        if (!autoScrollEnabled) return;
 
+        const el = scrollContainerRef.current;
         if (!el) return;
 
-        // Sofort ans Ende scrollen (für smooth scrollen: behavior: 'smooth')
-        el.parentElement?.scrollTo({ top: el.scrollHeight, behavior: "auto" });
-    }, [messages]);
+        // Scrolle zum Ende des Containers
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }, [messages, autoScrollEnabled]);
+
+    // Handler für Scroll-Events: Prüft ob User ganz unten ist
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.currentTarget;
+        const scrollTop = target.scrollTop;
+        const scrollHeight = target.scrollHeight;
+        const clientHeight = target.clientHeight;
+
+        // Toleranz von 5px - wenn User innerhalb von 5px vom Ende ist, gilt das als "unten"
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 5;
+
+        // Auto-Scroll aktivieren wenn User ganz unten ist, sonst deaktivieren
+        setAutoScrollEnabled(isAtBottom);
+    };
 
     const ws = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1155,7 +1174,9 @@ export default function Terminal() {
 
                 {/* Nachrichten-Bereich: Terminal Style */}
                 <div
+                    ref={scrollContainerRef}
                     className="flex-1 overflow-y-auto p-6 font-mono text-sm"
+                    onScroll={handleScroll}
                     style={{
                         scrollbarWidth: 'thin',
                         scrollbarColor: `${themeColors.textColor} ${themeColors.bgColor}`,
