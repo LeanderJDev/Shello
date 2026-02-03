@@ -160,7 +160,7 @@ const COMMANDS: Record<string, CmdHandler> = {
     },
     clearall: (_args, ctx) => {
         // handled specially by caller (could also return a flag)
-        ctx.pushMessage("", "CLEARALL", "System"); // Marker
+        ctx.pushMessage("", "CLEAR_ALL", "System"); // Marker
     },
     history: (_args, ctx) => {
         ctx.getHistory();
