@@ -405,6 +405,26 @@ async def handle_client(websocket, dbClient: DatabaseClient):
                     except Exception as e:
                         error = f"db error: {e}"
 
+            elif func == "delete_msg":
+                message_id = data.get("message_id") or data.get("MessageID")
+                if not message_id:
+                    error = "message_id required"
+                else:
+                    try:
+                        res = dbClient.delete_message(message_id)
+                        result = res
+                        # broadcast message_deleted to room: best-effort
+                        try:
+                            await broadcast_event(
+                                None,
+                                "message_deleted",
+                                {"message_id": message_id},
+                            )
+                        except Exception:
+                            pass
+                    except Exception as e:
+                        error = f"db error: {e}"
+
             else:
                 error = f"Unknown function: {func}"
 

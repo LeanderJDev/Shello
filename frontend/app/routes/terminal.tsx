@@ -100,6 +100,7 @@ type CmdHandler = (
         showSystemNotification: (text: string) => void;
         themeColors?: ThemeColors;
         setThemeColors?: (colors: ThemeColors) => void;
+        deleteMsg: (msgID: number) => void;
     },
 ) => void | Promise<void>;
 
@@ -188,6 +189,14 @@ const COMMANDS: Record<string, CmdHandler> = {
     //alle räume anzeigen
     roomtour: (args, ctx) => {
         ctx.getRooms();
+    },
+
+    annihilate: (args, ctx) => {
+        const num = parseInt(args[0]);
+        if (!Number.isNaN(num)) {
+            ctx.deleteMsg(num);
+        }
+        else throw new Error("annihilate: parameter not a number");
     },
 
     // === PERSONALISIERUNG ===
@@ -553,6 +562,10 @@ export default function Terminal() {
         pushMessage(text, kind, sender);
     }
 
+    function pushMessageDirectly(msg: { id: number; text: string; kind?: string; sender: string; timestamp?: Date }) {
+        pushMessage(msg.text, msg.kind ?? "IN", msg.sender, msg.timestamp, msg.id);
+    }
+
     const connectWebSocket = () => {
         ws.current = new WebSocket("ws://localhost:12000/ws");
         pushMessage("Connecting...", "TEMPINFO", "System");
@@ -576,8 +589,7 @@ export default function Terminal() {
                         // Neue Nachricht wurde gebroadcastet
                         const msg = data.payload?.message;
                         if (msg) {
-                            setMessages((prev) => [
-                                ...prev,
+                            pushMessageDirectly(
                                 {
                                     id: msg.MessageID,
                                     text: msg.Text ?? "",
@@ -586,8 +598,9 @@ export default function Terminal() {
                                     timestamp: msg.Time
                                         ? new Date(msg.Time.replace(" ", "T"))
                                         : new Date(),
-                                },
-                            ]);
+                                }
+                                
+                            );
                         }
                         break;
                     case "room_created":
@@ -751,6 +764,29 @@ export default function Terminal() {
                                 data.error,
                         ); //hintergrund abfrage muss nicht sichtbar sein
                     break;
+                case "delete_msg":
+                    if (data.error !== null)
+                        tryPushMessage(
+                            "Fehler beim Löschen der Nachricht: " + data.error,
+                            "ERROR",
+                            "System",
+                        );
+                    const msg = messages.find(msg => msg.id === data.result.message_id);
+                    if (msg) {
+                        tryPushMessage(
+                            `Nachricht '${msg.text}' erfolgreich gelöscht.`,
+                            "INFO",
+                            "System",
+                        );
+                        setMessages(prev => prev.filter(m => m.id !== data.result.message_id));
+                    } else {
+                        tryPushMessage(
+                            `Nachricht erfolgreich gelöscht.`,
+                            "INFO",
+                            "System",
+                        );
+                    }
+                    break;
             }
         };
 
@@ -792,6 +828,35 @@ export default function Terminal() {
         // Nachricht an Server senden
         ws.current?.send(
             JSON.stringify({ func: "msg", text: text, room_id: roomID }),
+        );
+    }
+
+    function deleteMsg(relativeMsg: number) {
+        var msgCount = 0;
+
+        if (relativeMsg <= 0) {
+            pushMessage(
+                "annihilate: parameter must be a positive number and not zero",
+                "ERROR",
+                "System",
+            );
+            return;
+        }
+
+        while (relativeMsg > 0) {
+            msgCount++;
+            const msg = messages[messages.length - msgCount];
+            if (msg.sender === user && (msg.kind === "IN" || msg.kind === "OUT")) {
+                relativeMsg--;
+                console.log(`counting msg for deletion: ${msg.id} (${msg.text})`);
+            }
+        }
+
+        const msgID = messages[messages.length - msgCount].id;
+
+        // Nachricht an Server senden
+        ws.current?.send(
+            JSON.stringify({ func: "delete_msg", message_id: msgID }),
         );
     }
 
@@ -890,7 +955,12 @@ export default function Terminal() {
         return () => clearTimeout(timer);
     }, [popoverText]);
 
-    function pushMessage(text: string, kind: string, sender: string) {
+    // Debug: messages nach Update loggen
+    useEffect(() => {
+        console.log(`messages updated: [${messages.length}]`, JSON.stringify(messages, null, 2));
+    }, [messages]);
+
+    function pushMessage(text: string, kind: string, sender: string, timestamp?: Date, id?: number) {
         if (kind === "CLEAR") {
             //falls kind: clear alle nachichten löschen (nur lokal)
             setMessages([]);
@@ -900,6 +970,8 @@ export default function Terminal() {
         //Neue Nachricht anhängen, aber vorher aufräumen
         setMessages((m) => {
             let updated = [...m];
+
+            console.log(`pushing message: [${kind}] ${text}`);
 
             // Wenn kind der aktuellen Nachricht INFO oder IN ist, lösche alle COMMAND, ERROR und TEMPINFO
             if (kind === "INFO" || kind === "IN") {
@@ -914,12 +986,12 @@ export default function Terminal() {
             return [
                 ...updated,
                 {
-                    id: idRef.current++,
+                    id: id ?? idRef.current++,
                     text,
                     kind,
                     sender:
                         kind !== "IN" && kind !== "OUT" ? "System" : user,
-                    timestamp: new Date(),
+                    timestamp: timestamp ?? new Date(),
                 },
             ];
         });
@@ -999,6 +1071,7 @@ export default function Terminal() {
                 showSystemNotification,
                 themeColors,
                 setThemeColors,
+                deleteMsg,
             });
         } catch (err: any) {
             // Fehler im Popover anzeigen
