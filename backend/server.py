@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 import websockets
 import traceback
 
-from .database import DatabaseClient
-from .shello_logging import setup_logging, log_with
+from database import DatabaseClient
+from shello_logging import setup_logging, log_with
 from logging import INFO, ERROR
 
 # in-memory room -> set(websocket) and socket -> set(room)
