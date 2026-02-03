@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 import websockets
 import traceback
 
-from database import DatabaseClient
-from shello_logging import setup_logging, log_with
+from .database import DatabaseClient
+from .shello_logging import setup_logging, log_with
 from logging import INFO, ERROR
 
 # in-memory room -> set(websocket) and socket -> set(room)
@@ -228,6 +228,7 @@ async def handle_client(websocket, dbClient: DatabaseClient):
                             error = f"db error: {e}"
                             new_id = None
                         if new_id:
+                            user_id = new_id  # Update the tracked user_id
                             result = {"username": username, "user_id": new_id}
 
             elif func == "create_room":
