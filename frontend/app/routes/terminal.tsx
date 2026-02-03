@@ -625,9 +625,23 @@ export default function Terminal() {
             nextRequestSilent.current = true;
             getRooms();
 
-            // Wenn ein gültiger Raum aus localStorage geladen wurde, lade auch die Historie
+            // Wenn ein gespeicherter User (nicht guest) vorhanden ist, setze ihn auf dem Server
+            if (user && user !== "guest") {
+                ws.current?.send(
+                    JSON.stringify({ func: "login_as", username: user })
+                );
+            }
+
+            // Wenn ein gültiger Raum aus localStorage geladen wurde, trete bei und lade Historie
             if (roomID > 0) {
-                getHistory();
+                // Warte kurz, damit login_as vorher verarbeitet werden kann
+                setTimeout(() => {
+                    // Trete dem Raum auf dem Server bei (wichtig für Mitgliederzählung)
+                    ws.current?.send(
+                        JSON.stringify({ func: "join_room", room_id: roomID })
+                    );
+                    getHistory();
+                }, 100); // 100ms Verzögerung
             }
         };
 
@@ -663,7 +677,7 @@ export default function Terminal() {
                         getRooms();
                         pushMessage(
                             `Raum '${data.payload.room_name}' erfolgreich erstellt.`,
-                            "INFO",
+                            "TEMPINFO",
                             "System",
                         );
                         break;
@@ -688,11 +702,12 @@ export default function Terminal() {
             // Response-Events vom Server (haben "response" statt "event")
             switch (data.response) {
                 case "get_rooms":
-                    // Ergebnis kann z.B. [{ ID: 1, Name: "Raum" }, ...] sein
+                    // Ergebnis kann z.B. [{ ID: 1, Name: "Raum", MemberCount: 5 }, ...] sein
                     const mappedRooms = Array.isArray(data.result)
                         ? data.result.map((r: any) => ({
                               id: r.ID ?? r.id,
                               name: r.Name ?? r.name ?? "",
+                              memberCount: r.MemberCount ?? r.memberCount ?? 0,
                           }))
                         : [];
 
@@ -707,11 +722,23 @@ export default function Terminal() {
                         return;
                     }
 
-                    const roomNames = mappedRooms.map(
-                        (r: { id: number; name: string }) => r.name,
+                    // Sortiere Räume nach Mitgliederzahl (meiste zuerst)
+                    const sortedRooms = [...mappedRooms].sort(
+                        (a, b) => b.memberCount - a.memberCount
                     );
+
+                    // Erstelle nummerierte Liste mit Mitgliederanzahl
+                    const roomList = sortedRooms
+                        .map((r, index) => {
+                            const members = r.memberCount > 0
+                                ? ` (${r.memberCount} ${r.memberCount === 1 ? 'Mitglied' : 'Mitglieder'})`
+                                : '';
+                            return `${index + 1}. ${r.name}${members}`;
+                        })
+                        .join('\n');
+
                     tryPushMessage(
-                        `Verfügbare Räume: \n${roomNames.join(", ")}`,
+                        `Verfügbare Räume:\n${roomList}`,
                         "TEMPINFO",
                         "System",
                     );
