@@ -563,7 +563,7 @@ export default function Terminal() {
         pushMessage(text, kind, sender);
     }
 
-    function pushMessageDirectly(msg: { id: number; text: string; kind?: string; sender: string; timestamp?: Date }) {
+    function pushMessageDirectly(msg: { id: number; text: string; kind?: string; sender: string; timestamp?: Date, readBy?: number; }) {
         pushMessage(msg.text, msg.kind ?? "IN", msg.sender, msg.timestamp, msg.id);
     }
 
@@ -601,7 +601,7 @@ export default function Terminal() {
                                         : new Date(),
                                     readBy: msg.ReadBy ?? 0, // Anzahl der Leser vom Server
                                 },
-                            ]);
+                            );
                         }
                         break;
                     case "room_created":
