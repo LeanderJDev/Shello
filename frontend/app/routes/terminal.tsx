@@ -456,6 +456,7 @@ export default function Terminal() {
             kind?: string;
             sender: string;
             timestamp?: Date;
+            readBy?: number; // Anzahl der Personen, die die Nachricht gelesen haben
         }[]
     >([]);
 
@@ -586,6 +587,7 @@ export default function Terminal() {
                                     timestamp: msg.Time
                                         ? new Date(msg.Time.replace(" ", "T"))
                                         : new Date(),
+                                    readBy: msg.ReadBy ?? 0, // Anzahl der Leser vom Server
                                 },
                             ]);
                         }
@@ -670,6 +672,7 @@ export default function Terminal() {
                                   timestamp: msg.Time
                                       ? new Date(msg.Time.replace(" ", "T"))
                                       : new Date(),
+                                  readBy: msg.ReadBy ?? 0, // Anzahl der Leser vom Server
                               }))
                             : [],
                     );
@@ -920,6 +923,7 @@ export default function Terminal() {
                     sender:
                         kind !== "IN" && kind !== "OUT" ? "System" : user,
                     timestamp: new Date(),
+                    readBy: kind === "OUT" ? 0 : undefined, // Nur für gesendete Nachrichten
                 },
             ];
         });
@@ -1284,6 +1288,18 @@ export default function Terminal() {
                                             >
                                                 {msg.text}
                                             </span>
+
+                                            {/* Lesebestätigung - nur für eigene Nachrichten (OUT oder wenn sender === username) */}
+                                            {msg.sender === username && msg.kind !== "COMMAND" && msg.kind !== "ERROR" && msg.kind !== "INFO" && msg.kind !== "TEMPINFO" && msg.readBy !== undefined && (
+                                                <div className="flex items-center gap-1 mt-1 opacity-60">
+                                                    <span style={{ color: textColor, fontSize: "0.7rem" }}>
+                                                        ✓
+                                                    </span>
+                                                    <span style={{ color: textColor, fontSize: "0.65rem" }}>
+                                                        {msg.readBy}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
