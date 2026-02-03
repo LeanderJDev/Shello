@@ -262,6 +262,14 @@ async def handle_client(websocket, dbClient: DatabaseClient):
             elif func == "get_rooms":
                 try:
                     result = dbClient.get_rooms()
+                    # Füge MemberCount hinzu basierend auf aktiven Verbindungen
+                    if isinstance(result, list):
+                        for room in result:
+                            room_id = room.get("ID") or room.get("id")
+                            if room_id:
+                                # Zähle aktive WebSockets in diesem Raum
+                                member_count = len(room_sockets.get(room_id, set()))
+                                room["MemberCount"] = member_count
                 except Exception as e:
                     error = f"db error: {e}"
 
