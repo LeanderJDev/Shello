@@ -13,6 +13,36 @@ export function meta({}: Route.MetaArgs) {
 }
 
 /**
+ * Speichert Session-Daten (User, Raum) in localStorage
+ */
+function saveSessionToStorage(user: string, roomID: number, roomName: string) {
+    try {
+        const sessionData = {
+            user,
+            roomID,
+            roomName,
+        };
+        localStorage.setItem("shelloSession", JSON.stringify(sessionData));
+    } catch (err) {
+        console.error("Fehler beim Speichern der Session:", err);
+    }
+}
+
+/**
+ * Lädt Session-Daten (User, Raum) aus localStorage
+ */
+function loadSessionFromStorage(): { user: string; roomID: number; roomName: string } | null {
+    try {
+        const stored = localStorage.getItem("shelloSession");
+        if (!stored) return null;
+        return JSON.parse(stored);
+    } catch (err) {
+        console.error("Fehler beim Laden der Session:", err);
+        return null;
+    }
+}
+
+/**
  * Parst eine Kommandozeilen-Eingabe in Befehl und Argumente
  * Unterstützt Quoting mit einfachen und doppelten Anführungszeichen
  * z.B. "send 'hallo welt'" -> cmd: "send", args: ["hallo welt"]
@@ -461,7 +491,11 @@ export default function Terminal() {
     >([]);
 
     // Aktueller Benutzername (wird im Prompt angezeigt)
-    const [user, setUser] = useState("guest");
+    // Versuche gespeicherte Session aus localStorage zu laden
+    const [user, setUser] = useState(() => {
+        const saved = loadSessionFromStorage();
+        return saved?.user || "guest";
+    });
 
     // Text für Fehler-Popover (leer = Popover ist versteckt)
     const [popoverText, setPopoverText] = useState(
@@ -503,11 +537,19 @@ export default function Terminal() {
         return () => clearInterval(id);
     }, [emotionKeys.length]);
 
-    const [[roomID, roomName], setRoom] = useState<[number, string]>([
-        -1,
-        "null",
-    ]);
+    const [[roomID, roomName], setRoom] = useState<[number, string]>(() => {
+        const saved = loadSessionFromStorage();
+        if (saved) {
+            return [saved.roomID, saved.roomName];
+        }
+        return [-1, "null"];
+    });
     const [rooms, setRooms] = useState<{ id: number; name: string }[]>([]);
+
+    // Session-Daten in localStorage speichern wenn sie sich ändern
+    useEffect(() => {
+        saveSessionToStorage(user, roomID, roomName);
+    }, [user, roomID, roomName]);
 
     // Liste aller verfügbaren Befehle (für Tab-Completion)
     const commands = Object.keys(COMMANDS);
@@ -582,6 +624,11 @@ export default function Terminal() {
             pushMessage("Connected to Shello Server.", "INFO", "System");
             nextRequestSilent.current = true;
             getRooms();
+
+            // Wenn ein gültiger Raum aus localStorage geladen wurde, lade auch die Historie
+            if (roomID > 0) {
+                getHistory();
+            }
         };
 
         //wenn der Server was schickt, wird das hier ausgeführt
