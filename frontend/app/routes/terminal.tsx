@@ -394,8 +394,17 @@ const COMMANDS: Record<string, CmdHandler> = {
 
     // Zeigt alle verfügbaren Befehle an
     help: async (_args, ctx) => {
-        ctx.showSystemNotification(
-            "Verfügbare Befehle:\n\n" +
+        ctx.showSystemNotification(helpText);
+    },
+
+    // exit - Beende die Terminal-Sitzung.
+    exit: (_args, ctx) => {
+        // TODO: Implementieren
+        ctx.showSystemNotification("exit command not implemented yet");
+    },
+};
+
+const helpText = "Verfügbare Befehle:\n\n" +
                 "=== Nachrichten ===\n" +
                 "  send <Nachricht>     - Sendet eine Nachricht\n" +
                 "  clear                - Löscht alle Info-Nachrichten aus dem Terminal\n" +
@@ -420,16 +429,7 @@ const COMMANDS: Record<string, CmdHandler> = {
                 "=== System ===\n" +
                 "  help                 - Diese Hilfe\n" +
                 "  h                    - Kurze Befehlsliste\n" +
-                "  exit                 - Beende Terminal-Sitzung (noch nicht implementiert)",
-        );
-    },
-
-    // exit - Beende die Terminal-Sitzung.
-    exit: (_args, ctx) => {
-        // TODO: Implementieren
-        ctx.showSystemNotification("exit command not implemented yet");
-    },
-};
+                "  exit                 - Beende Terminal-Sitzung (noch nicht implementiert)";
 
 /**
  * Theme-Definition für das Terminal
@@ -486,9 +486,6 @@ export default function Terminal() {
 
     // System-Benachrichtigung
     const [systemNotification, setSystemNotification] = useState("");
-
-    // Letzte System-Benachrichtigung (für Toggle-Funktion)
-    const [lastSystemNotification, setLastSystemNotification] = useState("");
 
     // Counter für eindeutige Message-IDs
     const idRef = useRef(1);
@@ -1034,7 +1031,6 @@ export default function Terminal() {
      */
     function showSystemNotification(text: string) {
         setSystemNotification(text);
-        setLastSystemNotification(text);
     }
 
     /**
@@ -1209,7 +1205,7 @@ export default function Terminal() {
                                 setSystemNotification(
                                     systemNotification
                                         ? ""
-                                        : lastSystemNotification,
+                                        : helpText,
                                 )
                             }
                             className="absolute right-0 px-2 py-1 rounded cursor-pointer transition-opacity hover:opacity-70"
