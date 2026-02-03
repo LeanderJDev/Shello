@@ -363,16 +363,13 @@ const COMMANDS: Record<string, CmdHandler> = {
                 "=== Nachrichten ===\n" +
                 "  send <Nachricht>     - Sendet eine Nachricht\n" +
                 "  clear                - Löscht alle Nachrichten aus dem Terminal\n" +
-                "  history              - Zeigt Befehlshistorie (noch nicht implementiert)\n\n" +
+                "  history              - Zeigt Nachrichtenhistorie\n\n" +
                 "=== Benutzer & Chat ===\n" +
                 "  whoami               - Zeigt aktuellen Benutzer\n" +
                 "  forge <Name>         - Erstellt neuen Benutzer\n" +
                 "  impersonate <Name>   - Wechselt zu anderem Benutzer\n" +
-                "  sc [Benutzer/Gruppe] - Wechselt Chat (noch nicht implementiert)\n" +
-                "  lc                   - Liste alle Benutzer/Gruppen (noch nicht implementiert)\n\n" +
-                "=== Gruppen ===\n" +
-                "  accede <Gruppe>      - Trete Gruppe bei (noch nicht implementiert)\n" +
-                "  secede <Gruppe>      - Verlasse Gruppe (noch nicht implementiert)\n\n" +
+                "  enter                - Wechselt Chat\n" +
+                "  roomtour             - Liste alle Benutzer/Gruppen\n\n" +
                 "=== Personalisierung ===\n" +
                 "  theme [Optionen]     - Passe Farben und Schrift an\n" +
                 "    -tc <Farbe>        - Textfarbe\n" +
