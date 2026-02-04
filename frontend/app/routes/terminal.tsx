@@ -864,24 +864,63 @@ export default function Terminal() {
     }
 
     const connectWebSocket = () => {
-        // Build WebSocket URL using Vite-exposed env vars (best practice)
-        // Recommended env vars (set via .env or the dev runner):
-        // - VITE_SHELLO_WS_HOST (optional, default: localhost)
-        // - VITE_SHELLO_WS_PORT (optional, default: VITE_PORT or 12000)
+        // Build WebSocket URL (refactored for readability).
+        // Behaviour preserved: supports
+        // - explicit origin (with or without port),
+        // - explicit host:port, and
+        // - relative origin (recommended when frontend and /api are on same domain behind nginx).
         const env = (import.meta as any)?.env ?? {};
-        const host = env.VITE_SHELLO_WS_HOST ?? "localhost";
-        const port = env.VITE_SHELLO_WS_PORT ?? env.VITE_PORT ?? "12000";
+        const wsUrl = (() => {
+            const host = (env.VITE_SHELLO_WS_HOST ?? "").trim();
+            const wsPath = env.VITE_SHELLO_WS_PATH ?? "/ws";
+            const port = env.VITE_SHELLO_WS_PORT ?? "12000";
+            const isBrowser = typeof window !== "undefined";
+            const scheme =
+                isBrowser && window.location.protocol === "https:"
+                    ? "wss"
+                    : "ws";
+            const normalizePath = (p: string) =>
+                p.startsWith("/") ? p : `/${p}`;
 
-        // Choose ws/wss based on page protocol
-        const protocol =
-            typeof window !== "undefined" &&
-            window.location.protocol === "https:"
-                ? "wss"
-                : "ws";
+            if (host) {
+                // host may be an origin (https://example.com[:port]) or bare hostname (example.com[:port]).
+                const hasScheme = host.includes("://");
+                const hostHasPort = /:\d+$/.test(host);
 
-        const wsUrl = `${protocol}://${host}:${port}/ws`;
+                if (hasScheme) {
+                    // replace http(s) scheme with ws(s) and optionally override the port
+                    let origin = host
+                        .replace(/^https?:/, scheme === "wss" ? "wss:" : "ws:")
+                        .replace(/\/$/, "");
+                    if (hostHasPort)
+                        origin = origin.replace(/:\d+$/, ":" + port);
+                    return origin + normalizePath(wsPath);
+                }
+
+                // bare hostname (may include :port)
+                return `${scheme}://${host}${normalizePath(wsPath)}`;
+            }
+
+            if (isBrowser) {
+                // relative origin: use current host; if it already contains a port and an env port is provided
+                // we keep current behaviour and replace trailing port with env port.
+                const currentHost = window.location.host;
+                const hostHasPort = /:\d+$/.test(currentHost);
+                const hostPart = hostHasPort
+                    ? currentHost.replace(
+                          /:\d+$/,
+                          ":" + (env.VITE_SHELLO_WS_PORT ?? "12000"),
+                      )
+                    : currentHost;
+                return `${scheme}://${hostPart}${normalizePath(wsPath)}`;
+            }
+
+            // non-browser fallback
+            return `ws://localhost:${env.VITE_SHELLO_WS_PORT ?? "12000"}${normalizePath(wsPath)}`;
+        })();
+
         ws.current = new WebSocket(wsUrl);
-        pushMessage("Connecting...", "TEMPINFO", systemUser);
+        pushMessage(`Connecting to ${wsUrl}...`, "TEMPINFO", systemUser);
 
         ws.current.onopen = () => {
             onlineFlag.current = true;
