@@ -178,7 +178,9 @@ const COMMANDS: Record<string, CmdHandler> = {
     },
     whoami: (_args, ctx) => {
         ctx.pushMessage(
-            "Aktueller Benutzer: <" + ctx.userName + ">",
+            ctx.userID !== -1
+                ? "Aktueller Benutzer: <" + ctx.userName + ">"
+                : "Aktueller Benutzer: ~" + ctx.userName + "~",
             "INFO",
             systemUser,
         );
