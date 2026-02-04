@@ -710,6 +710,39 @@ export default function Terminal() {
 
     const nextRequestSilent = useRef<boolean>(false);
 
+    // Developer Themes einspeichern
+    if (!(typeof window === "undefined")) {
+        const developerThemes = {
+            Benjamin: {
+                outerBgColor: "#1a1a1a",
+                bgColor: "#000000",
+                textColor: "#00ff00",
+                borderColor: "#333333",
+                buttonHoverBgColor: "#00cc00",
+                systemTextColor: "#ffcc00",
+            },
+            Leander: {
+                outerBgColor: "#1a1a1a",
+                bgColor: "#222",
+                textColor: "#888",
+                borderColor: "#444",
+                buttonHoverBgColor: "#666",
+                systemTextColor: "#FF8822",
+                userTextColor: "rainbow",
+            },
+        };
+
+        const savedThemes = JSON.parse(
+            localStorage.getItem("savedThemes") || "{}",
+        );
+        for (const [name, theme] of Object.entries(developerThemes)) {
+            if (!savedThemes[name]) {
+                savedThemes[name] = theme;
+            }
+        }
+        localStorage.setItem("savedThemes", JSON.stringify(savedThemes));
+    }
+
     function tryPushMessage(text: string, kind: string, sender: string) {
         if (nextRequestSilent.current) {
             nextRequestSilent.current = false;
