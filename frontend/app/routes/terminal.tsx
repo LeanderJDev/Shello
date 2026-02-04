@@ -15,13 +15,21 @@ export function meta({}: Route.MetaArgs) {
 /**
  * Speichert Session-Daten (User, Raum) in localStorage
  */
-function saveSessionToStorage(user: string, roomID: number, roomName: string) {
+function saveSessionToStorage(
+    userID: number,
+    userName: string,
+    roomID: number,
+    roomName: string,
+    themeColors: ThemeColors,
+) {
     try {
         if (typeof window === "undefined") return;
         const sessionData = {
-            user,
+            userID,
+            userName,
             roomID,
             roomName,
+            themeColors,
         };
         localStorage.setItem("shelloSession", JSON.stringify(sessionData));
     } catch (err) {
@@ -33,9 +41,11 @@ function saveSessionToStorage(user: string, roomID: number, roomName: string) {
  * Lädt Session-Daten (User, Raum) aus localStorage
  */
 function loadSessionFromStorage(): {
-    user: string;
+    userID: number;
+    userName: string;
     roomID: number;
     roomName: string;
+    themeColors: ThemeColors;
 } | null {
     try {
         if (typeof window === "undefined") return null;
@@ -107,6 +117,11 @@ function parseCommand(input: string) {
     return { cmd, args };
 }
 
+// System Username und ID
+const systemUser: [string, number] = ["System", -2];
+
+// guest = -1; undefined = -3
+
 /**
  * Signatur für Command Handler Funktionen
  * @param args - Array der übergebenen Argumente (ohne Befehlsnamen)
@@ -120,10 +135,15 @@ function parseCommand(input: string) {
 type CmdHandler = (
     args: string[],
     ctx: {
-        user: string;
+        userID: number;
+        userName: string;
         roomID: number;
-        setUser: (s: string) => void;
-        pushMessage: (s: string, kind: string, sender: string) => void;
+        setUser: (user: [number, string]) => void;
+        pushMessage: (
+            s: string,
+            kind: string,
+            sender: [string, number],
+        ) => void;
         sendMessage: (text: string) => void;
         createUser: (username: string) => void;
         createRoom: (roomName: string) => void;
@@ -153,30 +173,30 @@ const COMMANDS: Record<string, CmdHandler> = {
         ctx.pushMessage(
             "Verfügbare Befehle: " + Object.keys(COMMANDS).join(", "),
             "INFO",
-            "System",
+            systemUser,
         );
     },
     whoami: (_args, ctx) => {
         ctx.pushMessage(
-            "Aktueller Benutzer: <" + ctx.user + ">",
+            "Aktueller Benutzer: <" + ctx.userName + ">",
             "INFO",
-            "System",
+            systemUser,
         );
     },
     clear: (_args, ctx) => {
         // handled specially by caller (could also return a flag)
-        ctx.pushMessage("", "CLEAR", "System"); // Marker
+        ctx.pushMessage("", "CLEAR", systemUser); // Marker
     },
     clearall: (_args, ctx) => {
         // handled specially by caller (could also return a flag)
-        ctx.pushMessage("", "CLEAR_ALL", "System"); // Marker
+        ctx.pushMessage("", "CLEAR_ALL", systemUser); // Marker
     },
     history: (_args, ctx) => {
         ctx.getHistory();
     },
     send: (args, ctx) => {
         if (args.length === 0) throw new Error("send: Nachricht fehlt");
-        if (ctx.user === "guest")
+        if (ctx.userID === -1)
             throw new Error("send: Gäste können keine Nachrichten senden");
         if (ctx.roomID === -1)
             throw new Error(
@@ -192,7 +212,7 @@ const COMMANDS: Record<string, CmdHandler> = {
         ctx.pushMessage(
             `Erstelle neuen Nutzer '${args[0]}'...`,
             "TEMPINFO",
-            "System",
+            systemUser,
         );
         ctx.showSystemNotification(`Neuer Nutzer '${args[0]}' erstellt`);
     },
@@ -204,7 +224,7 @@ const COMMANDS: Record<string, CmdHandler> = {
         ctx.pushMessage(
             `Wechsel zu Nutzer '${args[0]}'...`,
             "TEMPINFO",
-            "System",
+            systemUser,
         );
     },
 
@@ -229,7 +249,7 @@ const COMMANDS: Record<string, CmdHandler> = {
         ctx.pushMessage(
             `Wechsel zu Raum '${args.join(" ")}'...`,
             "TEMPINFO",
-            "System",
+            systemUser,
         );
         ctx.enterRoom(args.join(" "));
     },
@@ -495,7 +515,7 @@ const helpText =
     "  whoami               - Zeigt aktuellen Benutzer\n" +
     "  forge <Name>         - Erstellt neuen Benutzer\n" +
     "  impersonate <Name>   - Wechselt zu anderem Benutzer\n" +
-    "  accede                - Wechselt Chat\n" +
+    "  accede               - Wechselt Chat\n" +
     "  roomtour             - Liste alle Benutzer/Gruppen\n\n" +
     "=== Personalisierung ===\n" +
     "  theme [Optionen]     - Passe Farben und Schrift an\n" +
@@ -536,24 +556,81 @@ const defaultTheme: ThemeColors = {
     systemTextColor: "#ffcc00",
 };
 
-function getRainbowColor(name: string): string {
-    /**
-     * Computes a simple numeric hash from the characters of a string by summing their UTF-16 code units.
-     *
-     * This is a deterministic, non-cryptographic hash:
-     * - Each character's code unit (charCodeAt(0)) is added to an accumulator starting at 0.
-     * - Characters outside the BMP are counted as two UTF-16 code units (surrogate pairs).
-     * - Collisions are likely for different strings and it should not be used for security purposes.
-     *
-     * @param name - The input string whose characters will be summed.
-     * @returns A number representing the sum of the UTF-16 code units of the input string.
-     */
-    const hash = [...name.repeat(20)].reduce(
-        (acc, char) => acc + char.charCodeAt(0),
-        0,
-    );
-    const hue = hash % 360;
-    return `hsl(${hue}, 100%, 50%)`;
+// Minimal helper: HSL -> RGB (0-255)
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+    s /= 100;
+    l /= 100;
+    const k = (n: number) => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n: number) =>
+        l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return [
+        Math.round(255 * f(0)),
+        Math.round(255 * f(8)),
+        Math.round(255 * f(4)),
+    ];
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+    const h = hex.replace(/^#/, "");
+    const v =
+        h.length === 3
+            ? h
+                  .split("")
+                  .map((c) => c + c)
+                  .join("")
+            : h;
+    const num = parseInt(v, 16) || 0;
+    return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+}
+
+function lum(r: number, g: number, b: number) {
+    const srgb = [r, g, b].map((v) => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+}
+
+function contrastRatio(
+    rgb1: [number, number, number],
+    rgb2: [number, number, number],
+) {
+    const L1 = lum(rgb1[0], rgb1[1], rgb1[2]);
+    const L2 = lum(rgb2[0], rgb2[1], rgb2[2]);
+    const [a, b] = L1 > L2 ? [L1, L2] : [L2, L1];
+    return (a + 0.05) / (b + 0.05);
+}
+
+function getRainbowColor(
+    user: [string, number],
+    bgHex: string = defaultTheme.bgColor,
+): string {
+    let crs = [];
+    let candidates = [];
+    for (let i = 0; i < 10; i++) {
+        const s = `${user[0]}${String(user[1]).repeat(3)}`.repeat(5 + i);
+        let h = 0;
+        for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+        const hue = h % 360;
+        const candidate = `hsl(${hue},100%,50%)`;
+        candidates.push(candidate);
+
+        // If contrast vs background is sufficient, use it; otherwise fall back to white/black.
+        const rgb = hslToRgb(hue, 100, 50);
+        const bgRgb = hexToRgb(bgHex || "#000000");
+        const cr = contrastRatio(rgb, bgRgb);
+        crs.push(cr);
+    }
+    // prefer first candidate with sufficient contrast (> 4.5), else pick the one with max contrast
+    const threshold = 7;
+    const idx = crs.findIndex((c) => c > threshold);
+    if (idx !== -1) {
+        return candidates[idx];
+    }
+    const maxCr = Math.max(...crs);
+    const index = crs.indexOf(maxCr);
+    return candidates[index];
 }
 
 /**
@@ -563,7 +640,7 @@ interface Message {
     id: number;
     text: string;
     kind?: string;
-    sender: string;
+    sender: [string, number];
     timestamp?: Date;
     readBy?: number; // Anzahl der Personen, die die Nachricht gelesen haben
     readself: boolean; // Ob der aktuelle User die Nachricht gelesen hat
@@ -581,20 +658,19 @@ export default function Terminal() {
     // Array aller angezeigten Nachrichten im Terminal
     const [messages, setMessages] = useState<Message[]>([]);
 
-    // Aktueller Benutzername (wird im Prompt angezeigt)
-    // Versuche gespeicherte Session aus localStorage zu laden
-    const [user, setUser] = useState(() => {
-        const saved = loadSessionFromStorage();
-        return saved?.user || "guest";
-    });
-
     // Text für Fehler-Popover (leer = Popover ist versteckt)
     const [popoverText, setPopoverText] = useState("");
 
     const [knownUsers, setUsers] = useState<{ id: number; name: string }[]>([]);
 
     // Theme-Farben
-    const [themeColors, setThemeColors] = useState<ThemeColors>(defaultTheme);
+    const [themeColors, setThemeColors] = useState<ThemeColors>(() => {
+        const saved = loadSessionFromStorage();
+        if (saved) {
+            return saved.themeColors;
+        }
+        return defaultTheme;
+    });
 
     // System-Benachrichtigung
     const [systemNotification, setSystemNotification] = useState("");
@@ -614,9 +690,6 @@ export default function Terminal() {
     // Ref für aktuellen messages state (um in WebSocket Handler Zugriff zu haben)
     const messagesStateRef = useRef(messages);
 
-    // Ref für aktuellen user state (um in WebSocket Handler Zugriff zu haben)
-    const userRef = useRef(user);
-
     // cycle through available emotions
     const emotionKeys = Object.values(EmotionKey) as EmotionKey[];
     const [emotionIndex, setEmotionIndex] = useState(0);
@@ -629,6 +702,19 @@ export default function Terminal() {
         return () => clearInterval(id);
     }, [emotionKeys.length]);
 
+    // Aktueller Benutzername (wird im Prompt angezeigt)
+    // Versuche gespeicherte Session aus localStorage zu laden
+    const [[userID, userName], setUser] = useState<[number, string]>(() => {
+        const saved = loadSessionFromStorage();
+        if (saved) {
+            return [saved.userID, saved.userName];
+        }
+        return [-1, "guest"];
+    });
+
+    // Ref für aktuellen user state (um in WebSocket Handler Zugriff zu haben)
+    const userRef = useRef(userID);
+
     const [[roomID, roomName], setRoom] = useState<[number, string]>(() => {
         const saved = loadSessionFromStorage();
         if (saved) {
@@ -640,8 +726,8 @@ export default function Terminal() {
 
     // Session-Daten in localStorage speichern wenn sie sich ändern
     useEffect(() => {
-        saveSessionToStorage(user, roomID, roomName);
-    }, [user, roomID, roomName]);
+        saveSessionToStorage(userID, userName, roomID, roomName, themeColors);
+    }, [userName, userID, roomID, roomName, themeColors]);
 
     // Liste aller verfügbaren Befehle (für Tab-Completion)
     const commands = Object.keys(COMMANDS);
@@ -651,7 +737,7 @@ export default function Terminal() {
     const [historyIndex, setHistoryIndex] = useState(-1);
 
     // Abgeleitete Variablen für Kompatibilität
-    const username = user;
+    const username = userName;
     const roomLabel = roomName !== "null" ? `${roomName}` : "No Room Selected";
     const inputValue = input;
     const setInputValue = setInput;
@@ -676,8 +762,8 @@ export default function Terminal() {
     }, [messages]);
 
     useEffect(() => {
-        userRef.current = user;
-    }, [user]);
+        userRef.current = userID;
+    }, [userID]);
 
     useEffect(() => {
         roomIdRef.current = roomID;
@@ -750,7 +836,11 @@ export default function Terminal() {
         localStorage.setItem("savedThemes", JSON.stringify(savedThemes));
     }
 
-    function tryPushMessage(text: string, kind: string, sender: string) {
+    function tryPushMessage(
+        text: string,
+        kind: string,
+        sender: [string, number],
+    ) {
         if (nextRequestSilent.current) {
             nextRequestSilent.current = false;
             console.log(`suppressed msg:\n${text}`);
@@ -789,18 +879,19 @@ export default function Terminal() {
 
         const wsUrl = `${protocol}://${host}:${port}/ws`;
         ws.current = new WebSocket(wsUrl);
-        pushMessage("Connecting...", "TEMPINFO", "System");
+        pushMessage("Connecting...", "TEMPINFO", systemUser);
 
         ws.current.onopen = () => {
             onlineFlag.current = true;
-            pushMessage("Connected to Shello Server.", "INFO", "System");
+            pushMessage("Connected to Shello Server.", "INFO", systemUser);
             nextRequestSilent.current = true;
             getRooms();
 
             // Wenn ein gespeicherter User (nicht guest) vorhanden ist, setze ihn auf dem Server
-            if (user && user !== "guest") {
+            if (userID && userID !== -1) {
+                console.log("Logging in as saved user:", userName);
                 ws.current?.send(
-                    JSON.stringify({ func: "login_as", username: user }),
+                    JSON.stringify({ func: "login_as", username: userName }),
                 );
             }
 
@@ -826,6 +917,7 @@ export default function Terminal() {
             if (data.event) {
                 switch (data.event) {
                     case "new_message":
+                        console.log("Received new_message event:", data);
                         // Neue Nachricht wurde gebroadcastet
                         const msg = data.payload?.message;
                         if (msg) {
@@ -833,7 +925,10 @@ export default function Terminal() {
                                 id: msg.MessageID,
                                 text: msg.Text ?? "",
                                 kind: "IN",
-                                sender: msg.Name ?? "unknown",
+                                sender: [
+                                    msg.Name ?? "unknown",
+                                    msg.UserID ?? -3,
+                                ],
                                 timestamp: msg.Time
                                     ? new Date(msg.Time.replace(" ", "T"))
                                     : new Date(),
@@ -849,7 +944,7 @@ export default function Terminal() {
                         pushMessage(
                             `Raum '${data.payload.room_name}' erfolgreich erstellt.`,
                             "TEMPINFO",
-                            "System",
+                            systemUser,
                         );
                         break;
                     case "room_updated":
@@ -883,7 +978,7 @@ export default function Terminal() {
                             break;
                         }
                         mesg.readBy = data.payload.total_readby_count;
-                        if (data.payload.username === userRef.current)
+                        if (data.payload.user_id === userRef.current)
                             mesg.readself = true;
                         editMessage(msgId, mesg);
                         break;
@@ -931,7 +1026,7 @@ export default function Terminal() {
                         tryPushMessage(
                             "Keine Räume verfügbar.",
                             "TEMPINFO",
-                            "System",
+                            systemUser,
                         );
                         return;
                     }
@@ -955,7 +1050,7 @@ export default function Terminal() {
                     tryPushMessage(
                         `Verfügbare Räume:\n${roomList}`,
                         "TEMPINFO",
-                        "System",
+                        systemUser,
                     );
                     break;
                 case "msg":
@@ -963,7 +1058,7 @@ export default function Terminal() {
                         tryPushMessage(
                             `Fehler beim Senden: ${data.error}`,
                             "ERROR",
-                            "System",
+                            systemUser,
                         );
                     }
                     // Nachricht wurde erfolgreich gesendet
@@ -977,7 +1072,7 @@ export default function Terminal() {
                             id: 0,
                             text: "",
                             kind: "CLEAR_ALL",
-                            sender: "SYSTEM",
+                            sender: systemUser,
                             timestamp: new Date(),
                             readBy: 0,
                             readself: false,
@@ -988,7 +1083,10 @@ export default function Terminal() {
                                 id: msg.MessageID,
                                 text: msg.Text ?? "",
                                 kind: "IN",
-                                sender: msg.Name ?? "unknown",
+                                sender: [
+                                    msg.Name ?? "unknown",
+                                    msg.UserID ?? -3,
+                                ],
                                 timestamp: msg.Time
                                     ? new Date(msg.Time.replace(" ", "T"))
                                     : new Date(),
@@ -1003,18 +1101,18 @@ export default function Terminal() {
                         tryPushMessage(
                             `Fehler beim Beitreten: ${data.error}`,
                             "ERROR",
-                            "System",
+                            systemUser,
                         );
                     }
                     // Erfolgreicher Beitritt - broadcast kommt vom Server
                     break;
                 case "login_as":
                     if (data.error === null) {
-                        setUser(data.result.username);
+                        setUser([data.result.user_id, data.result.username]);
                         tryPushMessage(
                             `Gewechselt zu Nutzer ${data.result.username}.`,
                             "INFO",
-                            "System",
+                            systemUser,
                         );
                         addUserToKnownList(
                             data.result.user_id,
@@ -1024,18 +1122,18 @@ export default function Terminal() {
                         tryPushMessage(
                             `Fehler beim Wechsel des Nutzers: ${data.error}`,
                             "ERROR",
-                            "System",
+                            systemUser,
                         );
                     // wir müssen hier auch noch die readconfirmation beachten, denn es kann ja sein, der user hat hier noch nix gelesen
                     confirm_all_messages();
                     break;
                 case "create_user":
                     if (data.error === null) {
-                        setUser(data.result.username);
+                        setUser([data.result.user_id, data.result.username]);
                         tryPushMessage(
                             `Gewechselt zu neu ertelltem Nutzer '${data.result.username}'.`,
                             "INFO",
-                            "System",
+                            systemUser,
                         );
                         addUserToKnownList(
                             data.result.user_id,
@@ -1045,7 +1143,7 @@ export default function Terminal() {
                         tryPushMessage(
                             `Fehler bei der Erstellung des Nutzers: ${data.error}`,
                             "ERROR",
-                            "System",
+                            systemUser,
                         );
                     break;
                 case "create_room":
@@ -1056,7 +1154,7 @@ export default function Terminal() {
                         pushMessage(
                             `Raum '${newRoomName}' erfolgreich erstellt.`,
                             "TEMPINFO",
-                            "System",
+                            systemUser,
                         );
 
                         // Direkt in den neu erstellten Raum wechseln
@@ -1064,7 +1162,7 @@ export default function Terminal() {
                         pushMessage(
                             `Zu Raum '${newRoomName}' gewechselt.`,
                             "TEMPINFO",
-                            "System",
+                            systemUser,
                         );
 
                         // Trete dem Raum auf dem Server bei
@@ -1082,7 +1180,7 @@ export default function Terminal() {
                         pushMessage(
                             `Fehler beim Erstellen des Raums: ${data.error}`,
                             "ERROR",
-                            "System",
+                            systemUser,
                         );
                     }
                     break;
@@ -1103,13 +1201,13 @@ export default function Terminal() {
                         tryPushMessage(
                             "Fehler beim Löschen der Nachricht: " + data.error,
                             "ERROR",
-                            "System",
+                            systemUser,
                         );
                     else {
                         tryPushMessage(
                             `Nachricht erfolgreich gelöscht.`,
                             "INFO",
-                            "System",
+                            systemUser,
                         );
                     }
                     break;
@@ -1124,7 +1222,7 @@ export default function Terminal() {
                 pushMessage(
                     "Disconnected from Shello Server.",
                     "INFO",
-                    "System",
+                    systemUser,
                 );
                 onlineFlag.current = false;
             }
@@ -1163,7 +1261,7 @@ export default function Terminal() {
                 console.table(
                     messages.map((m) => ({
                         id: m.id,
-                        sender: m.sender,
+                        sender: m.sender[0],
                         kind: m.kind,
                         text: m.text.substring(0, 50),
                         readBy: m.readBy,
@@ -1198,7 +1296,7 @@ export default function Terminal() {
             pushMessage(
                 "annihilate: parameter must be a positive number and not zero",
                 "ERROR",
-                "System",
+                systemUser,
             );
             return;
         }
@@ -1207,7 +1305,7 @@ export default function Terminal() {
             msgCount++;
             const msg = messages[messages.length - msgCount];
             if (
-                msg.sender === userRef.current &&
+                msg.sender[1] === userID &&
                 (msg.kind === "IN" || msg.kind === "OUT")
             ) {
                 relativeMsg--;
@@ -1288,12 +1386,12 @@ export default function Terminal() {
             pushMessage(
                 `Raum '${roomName}' nicht gefunden.`,
                 "ERROR",
-                "System",
+                systemUser,
             );
             return;
         }
         setRoom([match.id, match.name]);
-        pushMessage(`Zu Raum '${roomName}' gewechselt.`, "INFO", "System");
+        pushMessage(`Zu Raum '${roomName}' gewechselt.`, "INFO", systemUser);
 
         // Trete dem Raum auf dem Server bei
         ws.current?.send(
@@ -1365,7 +1463,7 @@ export default function Terminal() {
     function pushMessage(
         text: string,
         kind: string,
-        sender: string,
+        sender: [string, number],
         timestamp?: Date,
         id?: number,
         readby?: number,
@@ -1398,7 +1496,7 @@ export default function Terminal() {
             );
         }
 
-        //Neue Nachricht anhängen, aber vorher aufräumen
+        // Neue Nachricht anhängen, aber vorher aufräumen
         setMessages((m) => {
             let updated = [...m];
 
@@ -1418,11 +1516,7 @@ export default function Terminal() {
                     id: id ?? idRef.current++,
                     text,
                     kind,
-                    sender:
-                        sender ??
-                        (kind !== "IN" && kind !== "OUT"
-                            ? "System"
-                            : userRef.current),
+                    sender: sender,
                     timestamp: timestamp ?? new Date(),
                     readBy: kind === "OUT" ? 0 : (readby ?? 0),
                     readself: readself ?? true,
@@ -1461,7 +1555,7 @@ export default function Terminal() {
 
         setHistoryIndex(-1);
 
-        pushMessage(`> ${line}`, "COMMAND", "System");
+        pushMessage(`> ${line}`, "COMMAND", systemUser);
 
         try {
             // Kommando parsen
@@ -1488,7 +1582,8 @@ export default function Terminal() {
 
             // Handler ausführen mit Kontext
             await handler(finalArgs, {
-                user,
+                userID,
+                userName,
                 roomID,
                 setUser,
                 pushMessage,
@@ -1510,7 +1605,7 @@ export default function Terminal() {
         } catch (err: any) {
             // Fehler im Popover anzeigen
             //showPopover(err?.message ?? String(err));
-            pushMessage(err?.message ?? String(err), "ERROR", "System");
+            pushMessage(err?.message ?? String(err), "ERROR", systemUser);
         }
     }
 
@@ -1742,18 +1837,19 @@ export default function Terminal() {
                                 {group.messages.map((msg, i) => (
                                     <div
                                         key={i}
-                                        className={`mb-2 flex ${msg.sender === username || msg.sender === "System" ? "justify-start" : "justify-end"}`}
+                                        className={`mb-2 flex ${msg.sender[1] === userID || msg.sender[1] === -2 ? "justify-start" : "justify-end"}`}
                                     >
                                         <div
                                             className="max-w-[70%] break-words hyphens-auto"
                                             style={{
                                                 color:
-                                                    msg.sender === "System"
+                                                    msg.sender[1] ===
+                                                    systemUser[1]
                                                         ? systemTextColor
                                                         : textColor,
                                             }}
                                         >
-                                            {msg.sender === username ? (
+                                            {msg.sender[1] === userID ? (
                                                 <>
                                                     <span
                                                         className="opacity-60 text-xs"
@@ -1779,11 +1875,12 @@ export default function Terminal() {
                                                                     : userTextColor,
                                                         }}
                                                     >
-                                                        {msg.sender}
+                                                        {msg.sender[0]}
                                                         <br />
                                                     </span>
                                                 </>
-                                            ) : msg.sender !== "System" ? (
+                                            ) : msg.sender[1] !==
+                                              systemUser[1] ? (
                                                 <div className="flex justify-end gap-1">
                                                     <span
                                                         className="font-bold"
@@ -1797,7 +1894,7 @@ export default function Terminal() {
                                                                     : userTextColor,
                                                         }}
                                                     >
-                                                        {msg.sender}{" "}
+                                                        {msg.sender[0]}{" "}
                                                     </span>
                                                     <span
                                                         className="opacity-60 text-xs"
@@ -1819,7 +1916,8 @@ export default function Terminal() {
                                                 className="break-words hyphens-auto whitespace-pre-wrap"
                                                 style={{
                                                     color:
-                                                        msg.sender === "System"
+                                                        msg.sender[1] ===
+                                                        systemUser[1]
                                                             ? systemTextColor
                                                             : textColor,
                                                 }}
@@ -1828,7 +1926,7 @@ export default function Terminal() {
                                             </span>
 
                                             {/* Lesebestätigung - nur für eigene Nachrichten (OUT oder wenn sender === username) */}
-                                            {msg.sender === username &&
+                                            {msg.sender[1] === userID &&
                                                 msg.kind !== "COMMAND" &&
                                                 msg.kind !== "ERROR" &&
                                                 msg.kind !== "INFO" &&
