@@ -17,7 +17,7 @@ export function meta({}: Route.MetaArgs) {
  */
 function saveSessionToStorage(user: string, roomID: number, roomName: string) {
     try {
-        if (typeof window === 'undefined') return;
+        if (typeof window === "undefined") return;
         const sessionData = {
             user,
             roomID,
@@ -32,9 +32,13 @@ function saveSessionToStorage(user: string, roomID: number, roomName: string) {
 /**
  * Lädt Session-Daten (User, Raum) aus localStorage
  */
-function loadSessionFromStorage(): { user: string; roomID: number; roomName: string } | null {
+function loadSessionFromStorage(): {
+    user: string;
+    roomID: number;
+    roomName: string;
+} | null {
     try {
-        if (typeof window === 'undefined') return null;
+        if (typeof window === "undefined") return null;
         const stored = localStorage.getItem("shelloSession");
         if (!stored) return null;
         return JSON.parse(stored);
@@ -127,7 +131,9 @@ type CmdHandler = (
         getHistory: () => void;
         getRooms: () => void;
         roomExists: (roomName: string) => boolean;
-        getRoomByName: (roomName: string) => { id: number; name: string } | undefined;
+        getRoomByName: (
+            roomName: string,
+        ) => { id: number; name: string } | undefined;
         getAllRoomNames: () => string[];
         showSystemNotification: (text: string) => void;
         themeColors?: ThemeColors;
@@ -230,8 +236,7 @@ const COMMANDS: Record<string, CmdHandler> = {
         const num = parseInt(args[0]);
         if (!Number.isNaN(num)) {
             ctx.deleteMsg(num);
-        }
-        else throw new Error("annihilate: parameter not a number");
+        } else throw new Error("annihilate: parameter not a number");
     },
 
     // === PERSONALISIERUNG ===
@@ -371,7 +376,7 @@ const COMMANDS: Record<string, CmdHandler> = {
 
         // Theme im localStorage speichern
         try {
-            if (typeof window === 'undefined') {
+            if (typeof window === "undefined") {
                 ctx.showSystemNotification("localStorage nicht verfügbar");
                 return;
             }
@@ -396,7 +401,7 @@ const COMMANDS: Record<string, CmdHandler> = {
         if (args.length === 0) {
             // Liste alle gespeicherten Themes auf
             try {
-                if (typeof window === 'undefined') {
+                if (typeof window === "undefined") {
                     ctx.showSystemNotification("localStorage nicht verfügbar");
                     return;
                 }
@@ -424,7 +429,7 @@ const COMMANDS: Record<string, CmdHandler> = {
 
         // Theme aus localStorage laden
         try {
-            if (typeof window === 'undefined') {
+            if (typeof window === "undefined") {
                 ctx.showSystemNotification("localStorage nicht verfügbar");
                 return;
             }
@@ -460,33 +465,34 @@ const COMMANDS: Record<string, CmdHandler> = {
     },
 };
 
-const helpText = "Verfügbare Befehle:\n\n" +
-                "=== Nachrichten ===\n" +
-                "  send <Nachricht>     - Sendet eine Nachricht\n" +
-                "  clear                - Löscht alle Info-Nachrichten aus dem Terminal\n" +
-                "  clearall             - Löscht alle Nachrichten aus dem Terminal\n" +
-                "  history              - Zeigt Nachrichtenverlauf des aktuellen Raums\n\n" +
-                "=== Benutzer ===\n" +
-                "  whoami               - Zeigt aktuellen Benutzer\n" +
-                "  forge <Name>         - Erstellt neuen Benutzer\n" +
-                "  impersonate <Name>   - Wechselt zu anderem Benutzer\n" +
-                "  accede                - Wechselt Chat\n" +
-                "  roomtour             - Liste alle Benutzer/Gruppen\n\n" +
-                "=== Personalisierung ===\n" +
-                "  theme [Optionen]     - Passe Farben und Schrift an\n" +
-                "    -tc <Farbe>        - Textfarbe\n" +
-                "    -bg <Farbe>        - Hintergrundfarbe\n" +
-                "    -bc <Farbe>        - Randfarbe\n" +
-                "    -ob <Farbe>        - Äußere Hintergrundfarbe\n" +
-                "    -hv <Farbe>        - Button Hover Farbe\n" +
-                "    -sc <Farbe>        - System-Nachrichten Farbe\n" +
-                "    -f <Schrift>       - Schriftart (noch nicht implementiert)\n" +
-                "  theme save <Name>    - Speichere aktuelles Theme\n" +
-                "  theme load [Name]    - Lade gespeichertes Theme (ohne Name: Liste)\n\n" +
-                "=== System ===\n" +
-                "  help                 - Diese Hilfe\n" +
-                "  h                    - Kurze Befehlsliste\n" +
-                "  exit                 - Beende Terminal-Sitzung (noch nicht implementiert)";
+const helpText =
+    "Verfügbare Befehle:\n\n" +
+    "=== Nachrichten ===\n" +
+    "  send <Nachricht>     - Sendet eine Nachricht\n" +
+    "  clear                - Löscht alle Info-Nachrichten aus dem Terminal\n" +
+    "  clearall             - Löscht alle Nachrichten aus dem Terminal\n" +
+    "  history              - Zeigt Nachrichtenverlauf des aktuellen Raums\n\n" +
+    "=== Benutzer ===\n" +
+    "  whoami               - Zeigt aktuellen Benutzer\n" +
+    "  forge <Name>         - Erstellt neuen Benutzer\n" +
+    "  impersonate <Name>   - Wechselt zu anderem Benutzer\n" +
+    "  accede                - Wechselt Chat\n" +
+    "  roomtour             - Liste alle Benutzer/Gruppen\n\n" +
+    "=== Personalisierung ===\n" +
+    "  theme [Optionen]     - Passe Farben und Schrift an\n" +
+    "    -tc <Farbe>        - Textfarbe\n" +
+    "    -bg <Farbe>        - Hintergrundfarbe\n" +
+    "    -bc <Farbe>        - Randfarbe\n" +
+    "    -ob <Farbe>        - Äußere Hintergrundfarbe\n" +
+    "    -hv <Farbe>        - Button Hover Farbe\n" +
+    "    -sc <Farbe>        - System-Nachrichten Farbe\n" +
+    "    -f <Schrift>       - Schriftart (noch nicht implementiert)\n" +
+    "  theme save <Name>    - Speichere aktuelles Theme\n" +
+    "  theme load [Name]    - Lade gespeichertes Theme (ohne Name: Liste)\n\n" +
+    "=== System ===\n" +
+    "  help                 - Diese Hilfe\n" +
+    "  h                    - Kurze Befehlsliste\n" +
+    "  exit                 - Beende Terminal-Sitzung (noch nicht implementiert)";
 
 /**
  * Theme-Definition für das Terminal
@@ -567,7 +573,7 @@ export default function Terminal() {
 
     // Ref für aktuellen messages state (um in WebSocket Handler Zugriff zu haben)
     const messagesStateRef = useRef(messages);
-    
+
     // Ref für aktuellen user state (um in WebSocket Handler Zugriff zu haben)
     const userRef = useRef(user);
 
@@ -678,7 +684,15 @@ export default function Terminal() {
     }
 
     function pushMessageDirectly(msg: Message) {
-        pushMessage(msg.text, msg.kind ?? "IN", msg.sender, msg.timestamp, msg.id, msg.readBy, msg.readself);
+        pushMessage(
+            msg.text,
+            msg.kind ?? "IN",
+            msg.sender,
+            msg.timestamp,
+            msg.id,
+            msg.readBy,
+            msg.readself,
+        );
     }
 
     const connectWebSocket = () => {
@@ -694,7 +708,7 @@ export default function Terminal() {
             // Wenn ein gespeicherter User (nicht guest) vorhanden ist, setze ihn auf dem Server
             if (user && user !== "guest") {
                 ws.current?.send(
-                    JSON.stringify({ func: "login_as", username: user })
+                    JSON.stringify({ func: "login_as", username: user }),
                 );
             }
 
@@ -704,7 +718,7 @@ export default function Terminal() {
                 setTimeout(() => {
                     // Trete dem Raum auf dem Server bei (wichtig für Mitgliederzählung)
                     ws.current?.send(
-                        JSON.stringify({ func: "join_room", room_id: roomID })
+                        JSON.stringify({ func: "join_room", room_id: roomID }),
                     );
                     getHistory();
                 }, 100); // 100ms Verzögerung
@@ -723,19 +737,17 @@ export default function Terminal() {
                         // Neue Nachricht wurde gebroadcastet
                         const msg = data.payload?.message;
                         if (msg) {
-                            pushMessageDirectly(
-                                {
-                                    id: msg.MessageID,
-                                    text: msg.Text ?? "",
-                                    kind: "IN",
-                                    sender: msg.Name ?? "unknown",
-                                    timestamp: msg.Time
-                                        ? new Date(msg.Time.replace(" ", "T"))
-                                        : new Date(),
-                                    readBy: msg.ReadBy ?? 0, // Anzahl der Leser vom Server
-                                    readself: false,
-                                },
-                            );
+                            pushMessageDirectly({
+                                id: msg.MessageID,
+                                text: msg.Text ?? "",
+                                kind: "IN",
+                                sender: msg.Name ?? "unknown",
+                                timestamp: msg.Time
+                                    ? new Date(msg.Time.replace(" ", "T"))
+                                    : new Date(),
+                                readBy: msg.ReadBy ?? 0, // Anzahl der Leser vom Server
+                                readself: false,
+                            });
                         }
                         break;
                     case "room_created":
@@ -757,7 +769,10 @@ export default function Terminal() {
                         // Benutzer ist beigetreten
                         const joinedUser = data.payload;
                         if (joinedUser?.user_id && joinedUser?.username) {
-                            addUserToKnownList(joinedUser.user_id, joinedUser.username);
+                            addUserToKnownList(
+                                joinedUser.user_id,
+                                joinedUser.username,
+                            );
                         }
                         break;
                     case "user_left":
@@ -765,23 +780,38 @@ export default function Terminal() {
                         break;
                     case "readconfirmation_updated":
                         const msgId = data.payload?.message_id;
-                        var mesg = messagesStateRef.current.find(msg => msg.id === data.payload.message_id);
-                        if(!mesg) {
-                            console.warn("Message to delete not found in state:", data.payload.message_id);
+                        var mesg = messagesStateRef.current.find(
+                            (msg) => msg.id === data.payload.message_id,
+                        );
+                        if (!mesg) {
+                            console.warn(
+                                "Message to delete not found in state:",
+                                data.payload.message_id,
+                            );
                             break;
                         }
                         mesg.readBy = data.payload.total_readby_count;
-                        if (data.payload.username === userRef.current) mesg.readself = true;
+                        if (data.payload.username === userRef.current)
+                            mesg.readself = true;
                         editMessage(msgId, mesg);
                         break;
                     case "message_deleted":
-                        var mesg = messagesStateRef.current.find(msg => msg.id === data.payload.message_id);
-                        if(!mesg) {
-                            console.warn("Message to delete not found in state:", data.payload.message_id);
+                        var mesg = messagesStateRef.current.find(
+                            (msg) => msg.id === data.payload.message_id,
+                        );
+                        if (!mesg) {
+                            console.warn(
+                                "Message to delete not found in state:",
+                                data.payload.message_id,
+                            );
                             break;
-                        }
-                        else{
-                            console.log("message_deleted event received for id:", data.payload.message_id, "found message:", mesg);
+                        } else {
+                            console.log(
+                                "message_deleted event received for id:",
+                                data.payload.message_id,
+                                "found message:",
+                                mesg,
+                            );
                         }
                         mesg.text = "[Nachricht gelöscht]";
                         mesg.kind = "INFO";
@@ -816,18 +846,19 @@ export default function Terminal() {
 
                     // Sortiere Räume nach Mitgliederzahl (meiste zuerst)
                     const sortedRooms = [...mappedRooms].sort(
-                        (a, b) => b.memberCount - a.memberCount
+                        (a, b) => b.memberCount - a.memberCount,
                     );
 
                     // Erstelle nummerierte Liste mit Mitgliederanzahl
                     const roomList = sortedRooms
                         .map((r, index) => {
-                            const members = r.memberCount > 0
-                                ? ` (${r.memberCount} ${r.memberCount === 1 ? 'Mitglied' : 'Mitglieder'})`
-                                : '';
+                            const members =
+                                r.memberCount > 0
+                                    ? ` (${r.memberCount} ${r.memberCount === 1 ? "Mitglied" : "Mitglieder"})`
+                                    : "";
                             return `${index + 1}. ${r.name}${members}`;
                         })
-                        .join('\n');
+                        .join("\n");
 
                     tryPushMessage(
                         `Verfügbare Räume:\n${roomList}`,
@@ -847,19 +878,17 @@ export default function Terminal() {
                     break;
                 case "get_messages":
                     console.log(data.result);
-                    
+
                     if (Array.isArray(data.result)) {
-                        pushMessageDirectly(
-                            {
-                                id: 0,
-                                text: "",
-                                kind: "CLEAR_ALL",
-                                sender: "SYSTEM",
-                                timestamp: new Date(),
-                                readBy: 0,
-                                readself: false,
-                            },
-                        );
+                        pushMessageDirectly({
+                            id: 0,
+                            text: "",
+                            kind: "CLEAR_ALL",
+                            sender: "SYSTEM",
+                            timestamp: new Date(),
+                            readBy: 0,
+                            readself: false,
+                        });
 
                         data.result.forEach((msg: any) => {
                             pushMessageDirectly({
@@ -939,11 +968,18 @@ export default function Terminal() {
 
                         // Direkt in den neu erstellten Raum wechseln
                         setRoom([newRoomId, newRoomName]);
-                        pushMessage(`Zu Raum '${newRoomName}' gewechselt.`, "TEMPINFO", "System");
+                        pushMessage(
+                            `Zu Raum '${newRoomName}' gewechselt.`,
+                            "TEMPINFO",
+                            "System",
+                        );
 
                         // Trete dem Raum auf dem Server bei
                         ws.current?.send(
-                            JSON.stringify({ func: "join_room", room_id: newRoomId })
+                            JSON.stringify({
+                                func: "join_room",
+                                room_id: newRoomId,
+                            }),
                         );
 
                         // Aktualisiere Raumliste im Hintergrund (ohne Anzeige)
@@ -1028,22 +1064,24 @@ export default function Terminal() {
     // Debug-Funktion für Browser-Konsole
     // einfach debugMessages() in der Konsole aufrufen
     useEffect(() => {
-        if (typeof window !== 'undefined') {
+        if (typeof window !== "undefined") {
             (window as any).debugMessages = () => {
-                console.log('Messages:', messages);
-                console.table(messages.map(m => ({
-                    id: m.id,
-                    sender: m.sender,
-                    kind: m.kind,
-                    text: m.text.substring(0, 50),
-                    readBy: m.readBy,
-                    readself: m.readself
-                })));
+                console.log("Messages:", messages);
+                console.table(
+                    messages.map((m) => ({
+                        id: m.id,
+                        sender: m.sender,
+                        kind: m.kind,
+                        text: m.text.substring(0, 50),
+                        readBy: m.readBy,
+                        readself: m.readself,
+                    })),
+                );
                 return messages;
             };
         }
         return () => {
-            if (typeof window !== 'undefined') {
+            if (typeof window !== "undefined") {
                 delete (window as any).debugMessages;
             }
         };
@@ -1052,7 +1090,11 @@ export default function Terminal() {
     function sendMessage(text: string) {
         // Nachricht an Server senden
         ws.current?.send(
-            JSON.stringify({ func: "msg", text: text, room_id: roomIdRef.current }),
+            JSON.stringify({
+                func: "msg",
+                text: text,
+                room_id: roomIdRef.current,
+            }),
         );
     }
 
@@ -1071,9 +1113,14 @@ export default function Terminal() {
         while (relativeMsg > 0) {
             msgCount++;
             const msg = messages[messages.length - msgCount];
-            if (msg.sender === userRef.current && (msg.kind === "IN" || msg.kind === "OUT")) {
+            if (
+                msg.sender === userRef.current &&
+                (msg.kind === "IN" || msg.kind === "OUT")
+            ) {
                 relativeMsg--;
-                console.log(`counting msg for deletion: ${msg.id} (${msg.text})`);
+                console.log(
+                    `counting msg for deletion: ${msg.id} (${msg.text})`,
+                );
             }
         }
 
@@ -1081,11 +1128,15 @@ export default function Terminal() {
 
         // Nachricht an Server senden
         ws.current?.send(
-            JSON.stringify({ func: "delete_msg", message_id: msgID, room_id: roomIdRef.current }),
+            JSON.stringify({
+                func: "delete_msg",
+                message_id: msgID,
+                room_id: roomIdRef.current,
+            }),
         );
     }
 
-    function confirm_all_messages(){
+    function confirm_all_messages() {
         // Nachricht an Server senden
         if (!roomIdRef.current || roomIdRef.current <= 0) {
             console.warn("Cannot confirm messages: no valid room ID");
@@ -1093,7 +1144,11 @@ export default function Terminal() {
         }
 
         ws.current?.send(
-            JSON.stringify({ func: "confirm_all", room_id: roomIdRef.current, user_id: userRef.current }),
+            JSON.stringify({
+                func: "confirm_all",
+                room_id: roomIdRef.current,
+                user_id: userRef.current,
+            }),
         );
     }
 
@@ -1121,7 +1176,11 @@ export default function Terminal() {
     function getHistory() {
         // Nachricht an Server senden
         ws.current?.send(
-            JSON.stringify({ func: "get_messages", room_id: roomIdRef.current, user_id: userRef.current }),
+            JSON.stringify({
+                func: "get_messages",
+                room_id: roomIdRef.current,
+                user_id: userRef.current,
+            }),
         );
     }
 
@@ -1145,12 +1204,12 @@ export default function Terminal() {
 
         // Trete dem Raum auf dem Server bei
         ws.current?.send(
-            JSON.stringify({ func: "join_room", room_id: match.id })
+            JSON.stringify({ func: "join_room", room_id: match.id }),
         );
 
         // Hole Nachrichten für diesen Raum
         ws.current?.send(
-            JSON.stringify({ func: "get_messages", room_id: match.id })
+            JSON.stringify({ func: "get_messages", room_id: match.id }),
         );
     }
 
@@ -1164,7 +1223,9 @@ export default function Terminal() {
     /**
      * Sucht einen Raum nach Namen und gibt ihn zurück (oder undefined)
      */
-    function getRoomByName(roomName: string): { id: number; name: string } | undefined {
+    function getRoomByName(
+        roomName: string,
+    ): { id: number; name: string } | undefined {
         return rooms.find((r) => r.name === roomName);
     }
 
@@ -1196,9 +1257,7 @@ export default function Terminal() {
         setMessages((m) => {
             let updated = [...m];
 
-            const msgIndex = updated.findIndex(
-                (message) => message.id === id,
-            );
+            const msgIndex = updated.findIndex((message) => message.id === id);
 
             if (msgIndex === -1) {
                 console.warn("Message to edit not found:", id);
@@ -1210,7 +1269,15 @@ export default function Terminal() {
         });
     }
 
-    function pushMessage(text: string, kind: string, sender: string, timestamp?: Date, id?: number, readby?:number, readself?: boolean) {
+    function pushMessage(
+        text: string,
+        kind: string,
+        sender: string,
+        timestamp?: Date,
+        id?: number,
+        readby?: number,
+        readself?: boolean,
+    ) {
         if (kind === "CLEAR_ALL") {
             //falls kind: clear alle nachichten löschen (nur lokal)
             setMessages([]);
@@ -1221,7 +1288,7 @@ export default function Terminal() {
             //falls kind: clear alle nachichten löschen, die nicht IN sind (nur lokal)
             setMessages((m) => {
                 let updated = [...m];
-                updated = updated.filter((msg) => msg.kind === "IN" );
+                updated = updated.filter((msg) => msg.kind === "IN");
                 return [...updated];
             });
             return;
@@ -1230,7 +1297,11 @@ export default function Terminal() {
         if (kind === "IN" && readself !== true) {
             //post readconfirmation to server
             ws.current?.send(
-                JSON.stringify({ func: "post_readconfirmation", message_id: id, room_id: roomIdRef.current }),
+                JSON.stringify({
+                    func: "post_readconfirmation",
+                    message_id: id,
+                    room_id: roomIdRef.current,
+                }),
             );
         }
 
@@ -1254,10 +1325,14 @@ export default function Terminal() {
                     id: id ?? idRef.current++,
                     text,
                     kind,
-                    sender: sender ?? (kind !== "IN" && kind !== "OUT" ? "System" : userRef.current),
+                    sender:
+                        sender ??
+                        (kind !== "IN" && kind !== "OUT"
+                            ? "System"
+                            : userRef.current),
                     timestamp: timestamp ?? new Date(),
                     readBy: kind === "OUT" ? 0 : (readby ?? 0),
-                    readself: readself ?? true
+                    readself: readself ?? true,
                 },
             ];
         });
@@ -1444,9 +1519,7 @@ export default function Terminal() {
                         <button
                             onClick={() =>
                                 setSystemNotification(
-                                    systemNotification
-                                        ? ""
-                                        : helpText,
+                                    systemNotification ? "" : helpText,
                                 )
                             }
                             className="absolute right-0 px-2 py-1 rounded cursor-pointer transition-opacity hover:opacity-70"
@@ -1493,7 +1566,7 @@ export default function Terminal() {
                     className="flex-1 overflow-y-auto p-6 font-mono text-sm"
                     onScroll={handleScroll}
                     style={{
-                        scrollbarWidth: 'thin',
+                        scrollbarWidth: "thin",
                         scrollbarColor: `${themeColors.textColor} ${themeColors.bgColor}`,
                     }}
                 >
@@ -1516,7 +1589,10 @@ export default function Terminal() {
                     `}</style>
                     {(() => {
                         // Gruppiere Nachrichten nach Datum
-                        const groupedMessages: { date: string; messages: typeof messages }[] = [];
+                        const groupedMessages: {
+                            date: string;
+                            messages: typeof messages;
+                        }[] = [];
                         let currentDate = "";
                         let currentGroup: typeof messages = [];
 
@@ -1531,7 +1607,10 @@ export default function Terminal() {
 
                             if (msgDate !== currentDate) {
                                 if (currentGroup.length > 0) {
-                                    groupedMessages.push({ date: currentDate, messages: currentGroup });
+                                    groupedMessages.push({
+                                        date: currentDate,
+                                        messages: currentGroup,
+                                    });
                                 }
                                 currentDate = msgDate;
                                 currentGroup = [msg];
@@ -1542,7 +1621,10 @@ export default function Terminal() {
 
                         // Letzte Gruppe hinzufügen
                         if (currentGroup.length > 0) {
-                            groupedMessages.push({ date: currentDate, messages: currentGroup });
+                            groupedMessages.push({
+                                date: currentDate,
+                                messages: currentGroup,
+                            });
                         }
 
                         return groupedMessages.map((group, groupIndex) => (
@@ -1552,7 +1634,8 @@ export default function Terminal() {
                                     <div
                                         className="px-3 py-1 rounded text-xs font-semibold"
                                         style={{
-                                            backgroundColor: themeColors.bgColor,
+                                            backgroundColor:
+                                                themeColors.bgColor,
                                             color: themeColors.textColor,
                                             opacity: 0.7,
                                         }}
@@ -1569,13 +1652,20 @@ export default function Terminal() {
                                     >
                                         <div
                                             className="max-w-[70%] break-words hyphens-auto"
-                                            style={{ color: msg.sender === "System" ? systemTextColor : textColor }}
+                                            style={{
+                                                color:
+                                                    msg.sender === "System"
+                                                        ? systemTextColor
+                                                        : textColor,
+                                            }}
                                         >
                                             {msg.sender === username ? (
                                                 <>
                                                     <span
                                                         className="opacity-60 text-xs"
-                                                        style={{ color: textColor }}
+                                                        style={{
+                                                            color: textColor,
+                                                        }}
                                                     >
                                                         [
                                                         {msg.timestamp
@@ -1585,7 +1675,9 @@ export default function Terminal() {
                                                     </span>
                                                     <span
                                                         className="font-bold"
-                                                        style={{ color: textColor }}
+                                                        style={{
+                                                            color: textColor,
+                                                        }}
                                                     >
                                                         {msg.sender}
                                                         <br />
@@ -1595,13 +1687,17 @@ export default function Terminal() {
                                                 <div className="flex justify-end gap-1">
                                                     <span
                                                         className="font-bold"
-                                                        style={{ color: textColor }}
+                                                        style={{
+                                                            color: textColor,
+                                                        }}
                                                     >
                                                         {msg.sender}{" "}
                                                     </span>
                                                     <span
                                                         className="opacity-60 text-xs"
-                                                        style={{ color: textColor }}
+                                                        style={{
+                                                            color: textColor,
+                                                        }}
                                                     >
                                                         [
                                                         {msg.timestamp
@@ -1626,16 +1722,26 @@ export default function Terminal() {
                                             </span>
 
                                             {/* Lesebestätigung - nur für eigene Nachrichten (OUT oder wenn sender === username) */}
-                                            {msg.sender === username && msg.kind !== "COMMAND" && msg.kind !== "ERROR" && msg.kind !== "INFO" && msg.kind !== "TEMPINFO" && msg.readBy !== undefined && (
-                                                <div className="flex items-center gap-1 mt-1 opacity-60">
-                                                    <span style={{ color: textColor, fontSize: "0.7rem" }}>
-                                                        ✓
-                                                    </span>
-                                                    <span style={{ color: textColor, fontSize: "0.65rem" }}>
-                                                        {msg.readBy}
-                                                    </span>
-                                                </div>
-                                            )}
+                                            {msg.sender === username &&
+                                                msg.kind !== "COMMAND" &&
+                                                msg.kind !== "ERROR" &&
+                                                msg.kind !== "INFO" &&
+                                                msg.kind !== "TEMPINFO" &&
+                                                (msg.readBy ?? 0) > 0 && (
+                                                    <div
+                                                        className="opacity-60 text-xs mt-0.1 mb-0.5"
+                                                        style={{
+                                                            color: textColor,
+                                                            letterSpacing:
+                                                                "-0.15em",
+                                                        }}
+                                                        aria-hidden
+                                                    >
+                                                        {"✓".repeat(
+                                                            msg.readBy ?? 0,
+                                                        )}
+                                                    </div>
+                                                )}
                                         </div>
                                     </div>
                                 ))}
