@@ -772,7 +772,23 @@ export default function Terminal() {
     }
 
     const connectWebSocket = () => {
-        ws.current = new WebSocket("ws://localhost:12000/ws");
+        // Build WebSocket URL using Vite-exposed env vars (best practice)
+        // Recommended env vars (set via .env or the dev runner):
+        // - VITE_SHELLO_WS_HOST (optional, default: localhost)
+        // - VITE_SHELLO_WS_PORT (optional, default: VITE_PORT or 12000)
+        const env = (import.meta as any)?.env ?? {};
+        const host = env.VITE_SHELLO_WS_HOST ?? "localhost";
+        const port = env.VITE_SHELLO_WS_PORT ?? env.VITE_PORT ?? "12000";
+
+        // Choose ws/wss based on page protocol
+        const protocol =
+            typeof window !== "undefined" &&
+            window.location.protocol === "https:"
+                ? "wss"
+                : "ws";
+
+        const wsUrl = `${protocol}://${host}:${port}/ws`;
+        ws.current = new WebSocket(wsUrl);
         pushMessage("Connecting...", "TEMPINFO", "System");
 
         ws.current.onopen = () => {

@@ -394,7 +394,6 @@ async def handle_client(websocket, dbClient: DatabaseClient):
                         error = f"error 1: {e}"
                         user = {"error": "lookup failed"}
                     if user and user.get("error") is None:
-                        user_id = user.get("user_id")
                         result = user
                     else:
                         error = "error 2: User not found."
@@ -622,7 +621,8 @@ if __name__ == "__main__":
     try:
         server_port = int(os.getenv("SHELLO_WS_PORT", "12000"))
     except Exception:
-        server_port = 12000
+        print("Could not set server port, aborting.")
+        raise ValueError("Invalid SHELLO_WS_PORT value in environment")
 
     server_addr = {"host": server_host, "port": server_port}
 
