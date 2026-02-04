@@ -275,11 +275,32 @@ async def handle_client(websocket, dbClient: DatabaseClient):
 
             elif func == "get_messages":
                 room_id = data.get("room_id")
+                username = data.get("username")
+                rc_user = data.get("user_id", user_id)
                 if not room_id:
                     error = "room_id required"
                 else:
                     try:
                         result = dbClient.get_messages(room_id)
+                        # readby info hinzufügen => anzahl der user die die nachricht gelesen haben
+                        # readself info hinzufügen => ob der aktuelle user die nachricht gelesen hat
+                        if isinstance(result, list):
+                            for msg in result:
+                                message_id = msg.get("MessageID") or msg.get("message_id")
+                                if message_id:
+                                    read_count = 0
+                                    read_self = False
+                                    try:
+                                        rc_list = dbClient.get_readconfirmation(message_id)
+                                        if isinstance(rc_list, list):
+                                            for rc in rc_list:
+                                                read_count += 1
+                                                if (rc_user and ((rc.get("UserID") == rc_user or rc.get("user_id") == rc_user))):
+                                                    read_self = True
+                                    except Exception:
+                                        print("failed to get readconfirmation for message", message_id)
+                                    msg["ReadBy"] = read_count
+                                    msg["ReadSelf"] = read_self
                     except Exception as e:
                         error = f"db error: {e}"
 
@@ -385,21 +406,68 @@ async def handle_client(websocket, dbClient: DatabaseClient):
             elif func == "post_readconfirmation":
                 message_id = data.get("message_id") or data.get("MessageID")
                 rc_user = data.get("user_id", user_id)
-                if not message_id:
+                room_id = data.get("room_id")
+                if not room_id:
+                    error = "room_id required"
+                elif not message_id:
                     error = "message_id required"
                 else:
                     try:
                         res = dbClient.post_readconfirmation(message_id, rc_user)
                         result = res
+                        read_conf = dbClient.get_readconfirmation(message_id)
+                        count = len(read_conf)
                         # broadcast readconfirmation_updated to room/author: best-effort
                         try:
                             await broadcast_event(
-                                None,
+                                int(room_id),
                                 "readconfirmation_updated",
-                                {"message_id": message_id, "user_id": rc_user},
+                                {
+                                    "message_id": message_id,
+                                    "username": dbClient.get_user_by_ID(rc_user).get("username"),
+                                    "total_readby_count": count,
+                                },
                             )
                         except Exception:
-                            pass
+                            print("failed to broadcast readconfirmation_updated")
+                    except Exception as e:
+                        error = f"db error: {e}"
+
+            elif func == "confirm_all":
+                room_id = data.get("room_id")
+                rc_user = data.get("user_id", user_id)
+                if not room_id:
+                    error = "room_id required"
+                else:
+                    try:
+                        messages = dbClient.get_messages(room_id)
+                        confirmed = 0
+                        if isinstance(messages, list):
+                            for msg in messages:
+                                message_id = msg.get("MessageID") or msg.get("message_id")
+                                if message_id:
+                                    try:
+                                        #TODO: erst überprüfen, ob readconfirmation schon da ist, man kann es mehrmals hochladen,
+                                        #      also try-block funzt nicht so wie er soll
+                                        res = dbClient.post_readconfirmation(message_id, rc_user)
+                                        if res and res.get("error") is None:
+                                            confirmed += 1
+                                        # broadcast readconfirmation_updated to room/author: best-effort
+                                        try:
+                                            await broadcast_event(
+                                                int(room_id),
+                                                "readconfirmation_updated",
+                                                {
+                                                    "message_id": message_id,
+                                                    "username": dbClient.get_user_by_ID(rc_user).get("username"),
+                                                    "total_readby_count": count,
+                                                },
+                                            )
+                                        except Exception:
+                                            print("failed to broadcast readconfirmation_updated")
+                                    except Exception:
+                                        pass
+                        result = {"confirmed_count": confirmed}
                     except Exception as e:
                         error = f"db error: {e}"
 
@@ -431,7 +499,7 @@ async def handle_client(websocket, dbClient: DatabaseClient):
                                     {"message_id": message_id},
                                 )
                             except Exception:
-                                pass
+                                print("failed to broadcast message_deleted event")
                     except Exception as e:
                         error = f"db error: {e}"
 

@@ -17,6 +17,7 @@ export function meta({}: Route.MetaArgs) {
  */
 function saveSessionToStorage(user: string, roomID: number, roomName: string) {
     try {
+        if (typeof window === 'undefined') return;
         const sessionData = {
             user,
             roomID,
@@ -33,6 +34,7 @@ function saveSessionToStorage(user: string, roomID: number, roomName: string) {
  */
 function loadSessionFromStorage(): { user: string; roomID: number; roomName: string } | null {
     try {
+        if (typeof window === 'undefined') return null;
         const stored = localStorage.getItem("shelloSession");
         if (!stored) return null;
         return JSON.parse(stored);
@@ -369,6 +371,10 @@ const COMMANDS: Record<string, CmdHandler> = {
 
         // Theme im localStorage speichern
         try {
+            if (typeof window === 'undefined') {
+                ctx.showSystemNotification("localStorage nicht verfügbar");
+                return;
+            }
             const savedThemes = JSON.parse(
                 localStorage.getItem("savedThemes") || "{}",
             );
@@ -390,6 +396,10 @@ const COMMANDS: Record<string, CmdHandler> = {
         if (args.length === 0) {
             // Liste alle gespeicherten Themes auf
             try {
+                if (typeof window === 'undefined') {
+                    ctx.showSystemNotification("localStorage nicht verfügbar");
+                    return;
+                }
                 const savedThemes = JSON.parse(
                     localStorage.getItem("savedThemes") || "{}",
                 );
@@ -414,6 +424,10 @@ const COMMANDS: Record<string, CmdHandler> = {
 
         // Theme aus localStorage laden
         try {
+            if (typeof window === 'undefined') {
+                ctx.showSystemNotification("localStorage nicht verfügbar");
+                return;
+            }
             const savedThemes = JSON.parse(
                 localStorage.getItem("savedThemes") || "{}",
             );
@@ -497,6 +511,19 @@ const defaultTheme: ThemeColors = {
 };
 
 /**
+ * Message-Struktur für Terminal-Nachrichten
+ */
+interface Message {
+    id: number;
+    text: string;
+    kind?: string;
+    sender: string;
+    timestamp?: Date;
+    readBy?: number; // Anzahl der Personen, die die Nachricht gelesen haben
+    readself: boolean; // Ob der aktuelle User die Nachricht gelesen hat
+}
+
+/**
  * Haupt-Komponente für das Terminal-Interface
  * Bietet eine Kommandozeile mit verschiedenen Befehlen
  */
@@ -506,17 +533,7 @@ export default function Terminal() {
     const [input, setInput] = useState("");
 
     // Array aller angezeigten Nachrichten im Terminal
-    // Jede Nachricht hat: id (eindeutig), text (Inhalt), kind (Typ: out/error/info), sender (Absender)
-    const [messages, setMessages] = useState<
-        {
-            id: number;
-            text: string;
-            kind?: string;
-            sender: string;
-            timestamp?: Date;
-            readBy?: number; // Anzahl der Personen, die die Nachricht gelesen haben
-        }[]
-    >([]);
+    const [messages, setMessages] = useState<Message[]>([]);
 
     // Aktueller Benutzername (wird im Prompt angezeigt)
     // Versuche gespeicherte Session aus localStorage zu laden
@@ -550,6 +567,9 @@ export default function Terminal() {
 
     // Ref für aktuellen messages state (um in WebSocket Handler Zugriff zu haben)
     const messagesStateRef = useRef(messages);
+    
+    // Ref für aktuellen user state (um in WebSocket Handler Zugriff zu haben)
+    const userRef = useRef(user);
 
     // cycle through available emotions
     const emotionKeys = Object.values(EmotionKey) as EmotionKey[];
@@ -594,10 +614,25 @@ export default function Terminal() {
     const systemTextColor = themeColors.systemTextColor;
     const buttonHoverBgColor = themeColors.buttonHoverBgColor;
 
+    const roomIdRef = useRef(roomID);
+
     // Beim ersten Laden: Input-Feld fokussieren
     useEffect(() => {
         inputRef.current?.focus();
     }, []);
+
+    // Synchronisiere Refs mit State
+    useEffect(() => {
+        messagesStateRef.current = messages;
+    }, [messages]);
+
+    useEffect(() => {
+        userRef.current = user;
+    }, [user]);
+
+    useEffect(() => {
+        roomIdRef.current = roomID;
+    }, [roomID]);
 
     // Automatisch nach unten scrollen wenn neue Nachrichten hinzukommen
     // ABER nur wenn Auto-Scroll aktiviert ist (User nicht hochgescrollt hat)
@@ -627,6 +662,7 @@ export default function Terminal() {
 
     const ws = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const isUnmountingRef = useRef<boolean>(false);
 
     const onlineFlag = useRef<boolean>(false);
 
@@ -641,8 +677,8 @@ export default function Terminal() {
         pushMessage(text, kind, sender);
     }
 
-    function pushMessageDirectly(msg: { id: number; text: string; kind?: string; sender: string; timestamp?: Date, readBy?: number; }) {
-        pushMessage(msg.text, msg.kind ?? "IN", msg.sender, msg.timestamp, msg.id);
+    function pushMessageDirectly(msg: Message) {
+        pushMessage(msg.text, msg.kind ?? "IN", msg.sender, msg.timestamp, msg.id, msg.readBy, msg.readself);
     }
 
     const connectWebSocket = () => {
@@ -697,6 +733,7 @@ export default function Terminal() {
                                         ? new Date(msg.Time.replace(" ", "T"))
                                         : new Date(),
                                     readBy: msg.ReadBy ?? 0, // Anzahl der Leser vom Server
+                                    readself: false,
                                 },
                             );
                         }
@@ -726,29 +763,29 @@ export default function Terminal() {
                     case "user_left":
                         // Benutzer hat verlassen
                         break;
+                    case "readconfirmation_updated":
+                        const msgId = data.payload?.message_id;
+                        var mesg = messagesStateRef.current.find(msg => msg.id === data.payload.message_id);
+                        if(!mesg) {
+                            console.warn("Message to delete not found in state:", data.payload.message_id);
+                            break;
+                        }
+                        mesg.readBy = data.payload.total_readby_count;
+                        if (data.payload.username === userRef.current) mesg.readself = true;
+                        editMessage(msgId, mesg);
+                        break;
                     case "message_deleted":
-                        const mesg = messagesStateRef.current.find(msg => msg.id === data.payload.message_id);
-                        console.log("message_deleted event received for id:", data.payload.message_id, "found message:", mesg);
-                        //setMessages(prev => prev.filter(m => m.id !== data.payload.message_id));
-                        //anstelle es zu löschen, als gelöscht markieren
-                        setMessages((m) => {
-                            let updated = [...m];
-
-                            //get msg to delete
-                            const msgToDelete = updated.findIndex(
-                                (msg) => msg.id === data.payload.message_id,
-                            
-                            );
-                            
-                            if (msgToDelete === -1) {
-                                console.warn("Message to delete not found:", data.payload.message_id);
-                                return updated; //keine änderung
-                            }
-
-                            updated[msgToDelete].text = "[Nachricht gelöscht]";
-                            updated[msgToDelete].kind = "INFO";
-                            return [...updated];
-                        });
+                        var mesg = messagesStateRef.current.find(msg => msg.id === data.payload.message_id);
+                        if(!mesg) {
+                            console.warn("Message to delete not found in state:", data.payload.message_id);
+                            break;
+                        }
+                        else{
+                            console.log("message_deleted event received for id:", data.payload.message_id, "found message:", mesg);
+                        }
+                        mesg.text = "[Nachricht gelöscht]";
+                        mesg.kind = "INFO";
+                        editMessage(data.payload.message_id, mesg);
                         break;
                 }
                 return; // Broadcast-Event behandelt
@@ -810,20 +847,34 @@ export default function Terminal() {
                     break;
                 case "get_messages":
                     console.log(data.result);
-                    setMessages(
-                        Array.isArray(data.result)
-                            ? data.result.map((msg: any) => ({
-                                  id: msg.MessageID,
-                                  text: msg.Text ?? "",
-                                  kind: "IN",
-                                  sender: msg.Name ?? "unknown",
-                                  timestamp: msg.Time
-                                      ? new Date(msg.Time.replace(" ", "T"))
-                                      : new Date(),
-                                  readBy: msg.ReadBy ?? 0, // Anzahl der Leser vom Server
-                              }))
-                            : [],
-                    );
+                    
+                    if (Array.isArray(data.result)) {
+                        pushMessageDirectly(
+                            {
+                                id: 0,
+                                text: "",
+                                kind: "CLEAR_ALL",
+                                sender: "SYSTEM",
+                                timestamp: new Date(),
+                                readBy: 0,
+                                readself: false,
+                            },
+                        );
+
+                        data.result.forEach((msg: any) => {
+                            pushMessageDirectly({
+                                id: msg.MessageID,
+                                text: msg.Text ?? "",
+                                kind: "IN",
+                                sender: msg.Name ?? "unknown",
+                                timestamp: msg.Time
+                                    ? new Date(msg.Time.replace(" ", "T"))
+                                    : new Date(),
+                                readBy: msg.ReadBy ?? 0, // Anzahl der Leser vom Server
+                                readself: msg.ReadBySelf ?? false,
+                            });
+                        });
+                    }
                     break;
                 case "join_room":
                     if (data.error !== null) {
@@ -853,6 +904,8 @@ export default function Terminal() {
                             "ERROR",
                             "System",
                         );
+                    //wir müssen hier auch noch die readconfirmation beachten, denn es kann ja sein, der user hat hier noch nix gelesen
+                    confirm_all_messages();
                     break;
                 case "create_user":
                     if (data.error === null) {
@@ -935,6 +988,9 @@ export default function Terminal() {
         };
 
         ws.current.onclose = () => {
+            if (isUnmountingRef.current) {
+                return;
+            }
             if (onlineFlag.current) {
                 pushMessage(
                     "Disconnected from Shello Server.",
@@ -960,6 +1016,7 @@ export default function Terminal() {
         connectWebSocket();
 
         return () => {
+            isUnmountingRef.current = true;
             // Cleanup: Timeout abbrechen und WebSocket schließen
             if (reconnectTimeoutRef.current) {
                 clearTimeout(reconnectTimeoutRef.current);
@@ -968,10 +1025,34 @@ export default function Terminal() {
         };
     }, []);
 
+    // Debug-Funktion für Browser-Konsole
+    // einfach debugMessages() in der Konsole aufrufen
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            (window as any).debugMessages = () => {
+                console.log('Messages:', messages);
+                console.table(messages.map(m => ({
+                    id: m.id,
+                    sender: m.sender,
+                    kind: m.kind,
+                    text: m.text.substring(0, 50),
+                    readBy: m.readBy,
+                    readself: m.readself
+                })));
+                return messages;
+            };
+        }
+        return () => {
+            if (typeof window !== 'undefined') {
+                delete (window as any).debugMessages;
+            }
+        };
+    }, [messages]);
+
     function sendMessage(text: string) {
         // Nachricht an Server senden
         ws.current?.send(
-            JSON.stringify({ func: "msg", text: text, room_id: roomID }),
+            JSON.stringify({ func: "msg", text: text, room_id: roomIdRef.current }),
         );
     }
 
@@ -990,7 +1071,7 @@ export default function Terminal() {
         while (relativeMsg > 0) {
             msgCount++;
             const msg = messages[messages.length - msgCount];
-            if (msg.sender === user && (msg.kind === "IN" || msg.kind === "OUT")) {
+            if (msg.sender === userRef.current && (msg.kind === "IN" || msg.kind === "OUT")) {
                 relativeMsg--;
                 console.log(`counting msg for deletion: ${msg.id} (${msg.text})`);
             }
@@ -1000,7 +1081,19 @@ export default function Terminal() {
 
         // Nachricht an Server senden
         ws.current?.send(
-            JSON.stringify({ func: "delete_msg", message_id: msgID, room_id: roomID }),
+            JSON.stringify({ func: "delete_msg", message_id: msgID, room_id: roomIdRef.current }),
+        );
+    }
+
+    function confirm_all_messages(){
+        // Nachricht an Server senden
+        if (!roomIdRef.current || roomIdRef.current <= 0) {
+            console.warn("Cannot confirm messages: no valid room ID");
+            return;
+        }
+
+        ws.current?.send(
+            JSON.stringify({ func: "confirm_all", room_id: roomIdRef.current, user_id: userRef.current }),
         );
     }
 
@@ -1028,7 +1121,7 @@ export default function Terminal() {
     function getHistory() {
         // Nachricht an Server senden
         ws.current?.send(
-            JSON.stringify({ func: "get_messages", room_id: roomID }),
+            JSON.stringify({ func: "get_messages", room_id: roomIdRef.current, user_id: userRef.current }),
         );
     }
 
@@ -1099,7 +1192,25 @@ export default function Terminal() {
         return () => clearTimeout(timer);
     }, [popoverText]);
 
-    function pushMessage(text: string, kind: string, sender: string, timestamp?: Date, id?: number) {
+    function editMessage(id: number, msg: Message) {
+        setMessages((m) => {
+            let updated = [...m];
+
+            const msgIndex = updated.findIndex(
+                (message) => message.id === id,
+            );
+
+            if (msgIndex === -1) {
+                console.warn("Message to edit not found:", id);
+                return updated; //keine änderung
+            }
+
+            updated[msgIndex] = msg;
+            return [...updated];
+        });
+    }
+
+    function pushMessage(text: string, kind: string, sender: string, timestamp?: Date, id?: number, readby?:number, readself?: boolean) {
         if (kind === "CLEAR_ALL") {
             //falls kind: clear alle nachichten löschen (nur lokal)
             setMessages([]);
@@ -1114,6 +1225,13 @@ export default function Terminal() {
                 return [...updated];
             });
             return;
+        }
+
+        if (kind === "IN" && readself !== true) {
+            //post readconfirmation to server
+            ws.current?.send(
+                JSON.stringify({ func: "post_readconfirmation", message_id: id, room_id: roomIdRef.current }),
+            );
         }
 
         //Neue Nachricht anhängen, aber vorher aufräumen
@@ -1135,10 +1253,11 @@ export default function Terminal() {
                 {
                     id: id ?? idRef.current++,
                     text,
-                    kind,                                                           //whack shit: manchmal ist user hier guest, obwohl whoami den richtigen namen zurückgibt
-                    sender: sender ?? (kind !== "IN" && kind !== "OUT" ? "System" : user),
-                    timestamp: new Date(),
-                    readBy: kind === "OUT" ? 0 : undefined, // Nur für gesendete Nachrichten
+                    kind,
+                    sender: sender ?? (kind !== "IN" && kind !== "OUT" ? "System" : userRef.current),
+                    timestamp: timestamp ?? new Date(),
+                    readBy: kind === "OUT" ? 0 : (readby ?? 0),
+                    readself: readself ?? true
                 },
             ];
         });
