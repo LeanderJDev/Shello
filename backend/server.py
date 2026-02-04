@@ -7,7 +7,7 @@ import traceback
 
 from database import DatabaseClient
 from shello_logging import setup_logging, log_with
-from logging import INFO, ERROR
+from logging import DEBUG, INFO, ERROR
 
 # in-memory room -> set(websocket) and socket -> set(room)
 room_sockets = {}
@@ -434,9 +434,7 @@ async def handle_client(websocket, dbClient: DatabaseClient):
                                 "readconfirmation_updated",
                                 {
                                     "message_id": message_id,
-                                    "username": dbClient.get_user_by_ID(rc_user).get(
-                                        "username"
-                                    ),
+                                    "user_id": user_id,
                                     "total_readby_count": count,
                                 },
                             )
@@ -459,15 +457,31 @@ async def handle_client(websocket, dbClient: DatabaseClient):
                                 message_id = msg.get("MessageID") or msg.get(
                                     "message_id"
                                 )
-                                if message_id:
-                                    try:
-                                        # TODO: erst überprüfen, ob readconfirmation schon da ist, man kann es mehrmals hochladen,
-                                        #      also try-block funzt nicht so wie er soll
-                                        res = dbClient.post_readconfirmation(
-                                            message_id, rc_user
-                                        )
-                                        if res and res.get("error") is None:
-                                            confirmed += 1
+                                if not message_id:
+                                    continue
+                                try:
+                                    res = dbClient.post_readconfirmation(
+                                        message_id, rc_user
+                                    )
+                                    # increment only if a new confirmation was created
+                                    if (
+                                        isinstance(res, dict)
+                                        and res.get("created") is True
+                                    ):
+                                        confirmed += 1
+                                        # Get fresh total count for broadcast
+                                        try:
+                                            read_conf = dbClient.get_readconfirmation(
+                                                message_id
+                                            )
+                                            count = (
+                                                len(read_conf)
+                                                if isinstance(read_conf, list)
+                                                else 0
+                                            )
+                                        except Exception:
+                                            count = 0
+
                                         # broadcast readconfirmation_updated to room/author: best-effort
                                         try:
                                             await broadcast_event(
@@ -475,9 +489,7 @@ async def handle_client(websocket, dbClient: DatabaseClient):
                                                 "readconfirmation_updated",
                                                 {
                                                     "message_id": message_id,
-                                                    "username": dbClient.get_user_by_ID(
-                                                        rc_user
-                                                    ).get("username"),
+                                                    "user_id": rc_user,
                                                     "total_readby_count": count,
                                                 },
                                             )
@@ -485,8 +497,9 @@ async def handle_client(websocket, dbClient: DatabaseClient):
                                             print(
                                                 "failed to broadcast readconfirmation_updated"
                                             )
-                                    except Exception:
-                                        pass
+                                except Exception:
+                                    # per-message failure should not break the loop
+                                    continue
                         result = {"confirmed_count": confirmed}
                     except Exception as e:
                         error = f"db error: {e}"

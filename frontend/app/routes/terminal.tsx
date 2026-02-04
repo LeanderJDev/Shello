@@ -910,7 +910,7 @@ export default function Terminal() {
             }
         };
 
-        //wenn der Server was schickt, wird das hier ausgeführt
+        // wenn der Server was schickt, wird das hier ausgeführt
         ws.current.onmessage = (event) => {
             const data = JSON.parse(event.data); //event.data ist der Text vom Server
             console.log("Nachricht vom Server:", data);
@@ -1093,7 +1093,7 @@ export default function Terminal() {
                                     ? new Date(msg.Time.replace(" ", "T"))
                                     : new Date(),
                                 readBy: msg.ReadBy ?? 0, // Anzahl der Leser vom Server
-                                readself: msg.ReadBySelf ?? false,
+                                readself: msg.ReadSelf ?? false,
                             });
                         });
                     }

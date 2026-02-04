@@ -76,8 +76,25 @@ class DatabaseClient:
         )
 
     def post_readconfirmation(self, message_id, user_id):
+        # Check existing confirmations first to provide idempotent behavior
+        try:
+            existing = self.get_readconfirmation(message_id)
+            if isinstance(existing, list):
+                for rc in existing:
+                    # rc may use different keys depending on backend
+                    uid = rc.get("UserID")
+                    if uid is not None and int(uid) == int(user_id):
+                        return {"created": False, "info": "already_exists"}
+        except Exception:
+            # If the pre-check fails, fall back to attempting the POST below
+            pass
+
         data = {"MessageID": message_id, "UserID": user_id}
-        return self.request("/readconfirmation", method="POST", body=data)
+        res = self.request("/readconfirmation", method="POST", body=data)
+        # normalize common success shape to include 'created': True when possible
+        if isinstance(res, dict):
+            res.setdefault("created", True)
+        return res
 
     def get_readconfirmation(self, message_id):
         return self.request(f"/readconfirmation?MessageID={message_id}", method="GET")
