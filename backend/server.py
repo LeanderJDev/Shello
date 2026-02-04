@@ -394,6 +394,7 @@ async def handle_client(websocket, dbClient: DatabaseClient):
                         error = f"error 1: {e}"
                         user = {"error": "lookup failed"}
                     if user and user.get("error") is None:
+                        user_id = user.get("user_id")
                         result = user
                     else:
                         error = "error 2: User not found."
