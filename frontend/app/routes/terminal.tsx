@@ -872,15 +872,14 @@ export default function Terminal() {
         const env = (import.meta as any)?.env ?? {};
         const wsUrl = (() => {
             const host = (env.VITE_SHELLO_WS_HOST ?? "").trim();
-            const wsPath = env.VITE_SHELLO_WS_PATH ?? "/ws";
+            const wsPath = env.VITE_SHELLO_WS_PATH ?? "/ws/";
             const port = env.VITE_SHELLO_WS_PORT ?? "12000";
             const isBrowser = typeof window !== "undefined";
             const scheme =
                 isBrowser && window.location.protocol === "https:"
                     ? "wss"
                     : "ws";
-            const normalizePath = (p: string) =>
-                p.startsWith("/") ? p : `/${p}`;
+            const normalizePath = (p: string) => p.replace(/^\/+|\/+$/g, "");
 
             if (host) {
                 // host may be an origin (https://example.com[:port]) or bare hostname (example.com[:port]).
