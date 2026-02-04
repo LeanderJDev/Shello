@@ -121,6 +121,7 @@ type CmdHandler = (
     args: string[],
     ctx: {
         user: string;
+        roomID: number;
         setUser: (s: string) => void;
         pushMessage: (s: string, kind: string, sender: string) => void;
         sendMessage: (text: string) => void;
@@ -175,6 +176,12 @@ const COMMANDS: Record<string, CmdHandler> = {
     },
     send: (args, ctx) => {
         if (args.length === 0) throw new Error("send: Nachricht fehlt");
+        if (ctx.user === "guest")
+            throw new Error("send: Gäste können keine Nachrichten senden");
+        if (ctx.roomID === -1)
+            throw new Error(
+                "send: Kein Raum ausgewählt. Bitte einem Raum beitreten.",
+            );
         const message = args.join(" ");
         ctx.sendMessage(message);
     },
@@ -218,13 +225,13 @@ const COMMANDS: Record<string, CmdHandler> = {
 
     //raum betreten
     accede: (args, ctx) => {
-        if (!args[0]) throw new Error("enter: Raumname fehlt");
+        if (!args[0]) throw new Error("accede: Raumname fehlt");
         ctx.pushMessage(
-            `Wechsel zu Raum '${args[0]}'...`,
+            `Wechsel zu Raum '${args.join(" ")}'...`,
             "TEMPINFO",
             "System",
         );
-        ctx.enterRoom(args[0]);
+        ctx.enterRoom(args.join(" "));
     },
 
     //alle räume anzeigen
@@ -936,12 +943,13 @@ export default function Terminal() {
                     );
                     break;
                 case "msg":
-                    if (data.error !== null)
+                    if (data.error !== null) {
                         tryPushMessage(
-                            "Fehler beim Senden der Nachricht: " + data.error,
+                            `Fehler beim Senden: ${data.error}`,
                             "ERROR",
                             "System",
                         );
+                    }
                     // Nachricht wurde erfolgreich gesendet
                     // Die neue Nachricht kommt über broadcast "new_message"
                     break;
@@ -1002,7 +1010,7 @@ export default function Terminal() {
                             "ERROR",
                             "System",
                         );
-                    //wir müssen hier auch noch die readconfirmation beachten, denn es kann ja sein, der user hat hier noch nix gelesen
+                    // wir müssen hier auch noch die readconfirmation beachten, denn es kann ja sein, der user hat hier noch nix gelesen
                     confirm_all_messages();
                     break;
                 case "create_user":
@@ -1465,6 +1473,7 @@ export default function Terminal() {
             // Handler ausführen mit Kontext
             await handler(finalArgs, {
                 user,
+                roomID,
                 setUser,
                 pushMessage,
                 sendMessage,
