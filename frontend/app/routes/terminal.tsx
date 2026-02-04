@@ -879,7 +879,8 @@ export default function Terminal() {
                 isBrowser && window.location.protocol === "https:"
                     ? "wss"
                     : "ws";
-            const normalizePath = (p: string) => p.replace(/^\/+|\/+$/g, "");
+            const normalizePath = (p: string) =>
+                "/" + p.replace(/^\/+|\/+$/g, "") + "/";
 
             if (host) {
                 // host may be an origin (https://example.com[:port]) or bare hostname (example.com[:port]).
