@@ -250,6 +250,7 @@ const COMMANDS: Record<string, CmdHandler> = {
     //   -hv <Farbe>  - Button Hover Farbe
     //   -sc <Farbe>  - System-Nachrichten Farbe (system color)
     //   -f <Schriftart> - Schriftart (font)
+    //   -uc <Farbe>  - Nutzerfarbe (user color) "rainbow" für Farbe basierend auf Namen
     theme: (args, ctx) => {
         if (!ctx.setThemeColors || !ctx.themeColors) {
             ctx.showSystemNotification("Theme-Verwaltung nicht verfügbar");
@@ -263,6 +264,7 @@ const COMMANDS: Record<string, CmdHandler> = {
         let outerBgColor: string | null = null;
         let hoverColor: string | null = null;
         let systemColor: string | null = null;
+        let userColor: string | null = null;
         let font: string | null = null;
 
         for (let i = 0; i < args.length; i++) {
@@ -287,6 +289,9 @@ const COMMANDS: Record<string, CmdHandler> = {
             } else if (args[i] === "-f" && i + 1 < args.length) {
                 font = args[i + 1];
                 i++;
+            } else if (args[i] === "-uc" && i + 1 < args.length) {
+                userColor = args[i + 1];
+                i++;
             }
         }
 
@@ -297,7 +302,8 @@ const COMMANDS: Record<string, CmdHandler> = {
             !outerBgColor &&
             !hoverColor &&
             !systemColor &&
-            !font
+            !font &&
+            !userColor
         ) {
             ctx.showSystemNotification(
                 "Verwendung: theme [Optionen]\n" +
@@ -308,7 +314,8 @@ const COMMANDS: Record<string, CmdHandler> = {
                     "  -ob <Farbe>  Äußere Hintergrundfarbe\n" +
                     "  -hv <Farbe>  Button Hover Farbe\n" +
                     "  -sc <Farbe>  System-Nachrichten Farbe\n" +
-                    "  -f <Schrift> Schriftart (noch nicht implementiert)\n\n" +
+                    "  -f <Schrift> Schriftart (noch nicht implementiert)\n" +
+                    "  -uc <Farbe>  Nutzerfarbe (user color) 'rainbow' für Farbe basierend auf Namen\n\n" +
                     "Beispiel: theme -tc #00ff00 -bg #000000",
             );
             return;
@@ -352,6 +359,11 @@ const COMMANDS: Record<string, CmdHandler> = {
             // Schriftart wird hier nicht direkt im Theme gespeichert
             // TODO: Schriftart-Verwaltung implementieren
             changes.push(`Schriftart ${font} (noch nicht unterstützt)`);
+        }
+
+        if (userColor) {
+            newTheme.userTextColor = userColor;
+            changes.push(`Nutzerfarbe: ${userColor}`);
         }
 
         ctx.setThemeColors(newTheme);
@@ -504,6 +516,7 @@ interface ThemeColors {
     borderColor: string;
     buttonHoverBgColor: string;
     systemTextColor: string;
+    userTextColor?: string;
 }
 
 // Standard-Theme (Dunkles Terminal-Design)
@@ -515,6 +528,26 @@ const defaultTheme: ThemeColors = {
     buttonHoverBgColor: "#00cc00",
     systemTextColor: "#ffcc00",
 };
+
+function getRainbowColor(name: string): string {
+    /**
+     * Computes a simple numeric hash from the characters of a string by summing their UTF-16 code units.
+     *
+     * This is a deterministic, non-cryptographic hash:
+     * - Each character's code unit (charCodeAt(0)) is added to an accumulator starting at 0.
+     * - Characters outside the BMP are counted as two UTF-16 code units (surrogate pairs).
+     * - Collisions are likely for different strings and it should not be used for security purposes.
+     *
+     * @param name - The input string whose characters will be summed.
+     * @returns A number representing the sum of the UTF-16 code units of the input string.
+     */
+    const hash = [...name.repeat(20)].reduce(
+        (acc, char) => acc + char.charCodeAt(0),
+        0,
+    );
+    const hue = hash % 360;
+    return `hsl(${hue}, 100%, 50%)`;
+}
 
 /**
  * Message-Struktur für Terminal-Nachrichten
@@ -618,6 +651,9 @@ export default function Terminal() {
     const bgColor = themeColors.bgColor;
     const textColor = themeColors.textColor;
     const systemTextColor = themeColors.systemTextColor;
+    const userTextColor = themeColors.userTextColor
+        ? themeColors.userTextColor
+        : textColor;
     const buttonHoverBgColor = themeColors.buttonHoverBgColor;
 
     const roomIdRef = useRef(roomID);
@@ -1676,7 +1712,13 @@ export default function Terminal() {
                                                     <span
                                                         className="font-bold"
                                                         style={{
-                                                            color: textColor,
+                                                            color:
+                                                                userTextColor ==
+                                                                "rainbow"
+                                                                    ? getRainbowColor(
+                                                                          msg.sender,
+                                                                      )
+                                                                    : userTextColor,
                                                         }}
                                                     >
                                                         {msg.sender}
@@ -1688,7 +1730,13 @@ export default function Terminal() {
                                                     <span
                                                         className="font-bold"
                                                         style={{
-                                                            color: textColor,
+                                                            color:
+                                                                userTextColor ==
+                                                                "rainbow"
+                                                                    ? getRainbowColor(
+                                                                          msg.sender,
+                                                                      )
+                                                                    : userTextColor,
                                                         }}
                                                     >
                                                         {msg.sender}{" "}
